@@ -18,3 +18,5 @@ db = DB({
 
 pp(db.get_query_plan("SELECT * FROM customer c JOIN orders o ON o.o_custkey = c.c_custkey LIMIT 100;"))
 pp(db.get_query_plan_analysis("SELECT * FROM customer c JOIN orders o ON o.o_custkey = c.c_custkey LIMIT 100;"))
+pp(db.get_all_table_names())
+pp(db.get_distinct_rows_count('customer', 'c_nationkey'))
