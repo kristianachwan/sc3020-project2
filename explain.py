@@ -1,4 +1,15 @@
 import psycopg2
+import graphviz
+
+class Graph: 
+    def __init__(self, query_plan): 
+        self.g = graphviz.Digraph('G', filename='qep', engine='sfdp')
+        self.g.view() 
+        self.parse(query_plan)
+
+    def parse_query_plan(self, query_plan):
+        print(query_plan)
+
 class DB: 
     def __init__(self, config): 
         self.host = config['host']
@@ -8,13 +19,13 @@ class DB:
         self.password = config['password']
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
         self.cursor = self.connection.cursor()
-        self.statistics = self.get_statistics()
+        # self.statistics = self.get_statistics()
 
-    def get_query_plan(self, query): 
+    def get_query_plan(self, query: str): 
         query_plan = self.execute("EXPLAIN (FORMAT JSON) " + query)[0][0][0][0]['Plan']
         return query_plan
 
-    def get_query_plan_analysis(self, query): 
+    def get_query_plan_analysis(self, query: str): 
         query_plan_analysis = self.execute("EXPLAIN ANALYZE " + query)
         return query_plan_analysis 
 
@@ -61,7 +72,7 @@ class DB:
 
         return query_results[0][0][0]
     
-    def get_row_count(self, table_name): 
+    def get_row_count(self, table_name: str): 
         query_results = self.execute(
             """
             SELECT 
@@ -72,7 +83,7 @@ class DB:
 
         return query_results[0][0][0]
 
-    def get_column_names(self, table_name): 
+    def get_column_names(self, table_name: str): 
         query_results = self.execute(
             """
             SELECT t.column_name 
@@ -83,7 +94,7 @@ class DB:
         column_names = [] 
         for column_name, in query_results[0]: 
             column_names.append(column_name)
-        print(column_names)
+
         return column_names
 
     def get_statistics(self): 

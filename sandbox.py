@@ -1,4 +1,4 @@
-from explain import DB
+from explain import DB, Graph
 from pprint import pp
 
 host = "aws-0-ap-southeast-1.pooler.supabase.com"
@@ -22,3 +22,5 @@ pp(db.get_table_names())
 pp(db.get_distinct_row_count('customer', 'c_nationkey'))
 pp(db.get_column_names('customer'))
 pp(db.statistics)
+
+g = Graph(db.get_query_plan())

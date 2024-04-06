@@ -1,3 +1,5 @@
+graphviz==0.20.3
 pillow==10.3.0
+psycopg2==2.9.9
 tk==0.1.0
 ttkbootstrap==1.10.1
