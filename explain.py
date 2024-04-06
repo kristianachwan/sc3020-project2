@@ -2,11 +2,20 @@ import psycopg2
 import graphviz
 from pprint import pp
   
+BLOCK_SIZE = 128 # need to be researched to actually know how much is this
+
 class Node: 
     def __init__(self, node_type): 
         self.node_type = node_type
         self.children = [] 
+        self.row_count = 0 
+        
+    def get_block_count(self): 
+        return self.count / BLOCK_SIZE
 
+    def get_distinct_rows(self, table_name, column_name): 
+        return 0     
+    
 class Graph:    
     def __init__(self, query_plan): 
         self.root = self.parse_query_plan(query_plan)
