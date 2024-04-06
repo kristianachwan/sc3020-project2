@@ -1,14 +1,18 @@
 import psycopg2
 import graphviz
-
+from pprint import pp
 class Graph: 
     def __init__(self, query_plan): 
-        self.g = graphviz.Digraph('G', filename='qep', engine='sfdp')
+        self.g = graphviz.Digraph('G', filename='qep')
+        self.g.attr(rankdir='BT')
+        self.parse_query_plan(query_plan)
         self.g.view() 
-        self.parse(query_plan)
 
     def parse_query_plan(self, query_plan):
-        print(query_plan)
+        if 'Plans' in query_plan: 
+            for child_query_plan in query_plan['Plans']: 
+                self.g.edge(child_query_plan['Node Type'], query_plan['Node Type'])
+                self.parse_query_plan(child_query_plan) 
 
 class DB: 
     def __init__(self, config): 
@@ -19,7 +23,7 @@ class DB:
         self.password = config['password']
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
         self.cursor = self.connection.cursor()
-        # self.statistics = self.get_statistics()
+        self.statistics = {} # self.get_statistics()
 
     def get_query_plan(self, query: str): 
         query_plan = self.execute("EXPLAIN (FORMAT JSON) " + query)[0][0][0][0]['Plan']
