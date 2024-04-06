@@ -1,18 +1,36 @@
 import psycopg2
 import graphviz
 from pprint import pp
-class Graph: 
+  
+class Node: 
+    def __init__(self, node_type): 
+        self.node_type = node_type
+        self.children = [] 
+
+class Graph:    
     def __init__(self, query_plan): 
-        self.g = graphviz.Digraph('G', filename='qep')
-        self.g.attr(rankdir='BT')
-        self.parse_query_plan(query_plan)
-        self.g.view() 
+        self.root = self.parse_query_plan(query_plan)
 
     def parse_query_plan(self, query_plan):
+        node = Node(query_plan['Node Type'])
         if 'Plans' in query_plan: 
             for child_query_plan in query_plan['Plans']: 
-                self.g.edge(child_query_plan['Node Type'], query_plan['Node Type'])
-                self.parse_query_plan(child_query_plan) 
+                node.children.append(self.parse_query_plan(child_query_plan)) 
+
+        return node 
+    
+class GraphVisualizer: 
+    def __init__(self, graph): 
+        self.graphviz = graphviz.Digraph('G', filename='qep')
+        self.graphviz.attr(rankdir='BT')
+        self.parse_graph(graph.root)
+        self.graphviz.view() 
+
+    def parse_graph(self, node):
+        if node.children: 
+            for child in node.children: 
+                self.graphviz.edge(child.node_type, node.node_type)
+                self.parse_graph(child)
 
 class DB: 
     def __init__(self, config): 

@@ -1,0 +1,7 @@
+digraph G {
+	rankdir=BT
+	"Nested Loop" -> Limit
+	"Seq Scan" -> "Nested Loop"
+	Memoize -> "Nested Loop"
+	"Index Scan" -> Memoize
+}
