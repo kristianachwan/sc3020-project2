@@ -8,6 +8,7 @@ class DB:
         self.password = config['password']
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
         self.cursor = self.connection.cursor()
+        self.statistics = self.get_statistics()
 
     def get_query_plan(self, query): 
         query_plan = self.execute("EXPLAIN (FORMAT JSON) " + query)[0][0][0][0]['Plan']
@@ -32,7 +33,7 @@ class DB:
         
         return True, None
 
-    def get_all_table_names(self): 
+    def get_table_names(self): 
         query_results = self.execute(
             """
             SELECT 
@@ -49,7 +50,7 @@ class DB:
             table_names.append(table_name)
         return table_names
 
-    def get_distinct_rows_count(self, table_name, column_name): 
+    def get_distinct_row_count(self, table_name, column_name): 
         query_results = self.execute(
             """
             SELECT 
@@ -60,13 +61,41 @@ class DB:
 
         return query_results[0][0][0]
     
-    def get_rows_count(self, table_name): 
+    def get_row_count(self, table_name): 
         query_results = self.execute(
             """
             SELECT 
                 COUNT(*) 
                 FROM {table_name}
-            """.format(table_name)
+            """.format(table_name=table_name)
         )
 
         return query_results[0][0][0]
+
+    def get_column_names(self, table_name): 
+        query_results = self.execute(
+            """
+            SELECT t.column_name 
+            FROM information_schema.columns t 
+            WHERE t.table_name = '{table_name}'
+            """.format(table_name=table_name)
+        )
+        column_names = [] 
+        for column_name, in query_results[0]: 
+            column_names.append(column_name)
+        print(column_names)
+        return column_names
+
+    def get_statistics(self): 
+        statistics = {} 
+        for table_name in self.get_table_names(): 
+            table_statistics = {} 
+            table_statistics['row_count'] = self.get_row_count(table_name)
+            distinct_row_count = {} 
+            for column_name in self.get_column_names(table_name): 
+                distinct_row_count[column_name] = self.get_distinct_row_count(table_name, column_name)
+            
+            table_statistics['distinct_row_count'] = distinct_row_count 
+            statistics[table_name] = table_statistics 
+        
+        return statistics 
