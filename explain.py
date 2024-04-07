@@ -5,8 +5,9 @@ from pprint import pp
 BLOCK_SIZE = 128 # need to be researched to actually know how much is this
 
 class Node: 
-    def __init__(self, node_type): 
-        self.node_type = node_type
+    def __init__(self, query_plan): 
+        self.node_type = query_plan['Node Type']
+        self.total_cost = query_plan['Total Cost']
         self.children = [] 
         self.row_count = 0 
         
@@ -14,14 +15,14 @@ class Node:
         return self.count / BLOCK_SIZE
 
     def get_distinct_rows(self, table_name, column_name): 
-        return 0     
+        return 0 
     
 class Graph:    
     def __init__(self, query_plan): 
         self.root = self.parse_query_plan(query_plan)
 
     def parse_query_plan(self, query_plan):
-        node = Node(query_plan['Node Type'])
+        node = Node(query_plan)
         if 'Plans' in query_plan: 
             for child_query_plan in query_plan['Plans']: 
                 node.children.append(self.parse_query_plan(child_query_plan)) 
