@@ -1,11 +1,11 @@
 from explain import DB, Graph, GraphVisualizer
 from pprint import pp
 
-host = "aws-0-ap-southeast-1.pooler.supabase.com"
-port = "5432"
-database = "postgres" 
-user = "postgres.jvbpkioaofgmhwkwdsvg"
-password = "souravkontol" 
+host = ""
+port = ""
+database = "" 
+user = ""
+password = "" 
 
 
 db = DB({
