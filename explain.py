@@ -1,12 +1,13 @@
 import psycopg2
 import graphviz
-import os
+import random
 from pprint import pp
-  
+
 BLOCK_SIZE = 128 # need to be researched to actually know how much is this
 
 class Node: 
     def __init__(self, query_plan): 
+        self.uuid = str(random.random())
         self.node_type = query_plan['Node Type']
         self.startup_cost = query_plan['Startup Cost']
         self.total_cost = query_plan['Total Cost']
@@ -23,7 +24,7 @@ class Node:
 class Graph:    
     def __init__(self, query_plan): 
         self.root = self.parse_query_plan(query_plan)
-
+    
     def parse_query_plan(self, query_plan):
         node = Node(query_plan)
         if 'Plans' in query_plan: 
@@ -42,7 +43,9 @@ class GraphVisualizer:
     def parse_graph(self, node):
         if node.children: 
             for child in node.children: 
-                self.graphviz.edge(child.node_type, node.node_type)
+                self.graphviz.node(child.uuid, child.node_type)
+                self.graphviz.node(node.uuid, node.node_type)
+                self.graphviz.edge(child.uuid, node.uuid)
                 self.parse_graph(child)
 
 class DB: 
