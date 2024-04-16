@@ -1,2 +1,7 @@
+from interface import App
+from interface import InnerState
+
 if __name__ == '__main__':
-    pass 
+    inner_state = InnerState()
+    app = App(inner_state)
+    app.mainloop()
