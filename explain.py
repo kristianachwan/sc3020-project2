@@ -8,10 +8,11 @@ BLOCK_SIZE = 128 # need to be researched to actually know how much is this
 class Node: 
     def __init__(self, query_plan): 
         self.node_type = query_plan['Node Type']
+        self.startup_cost = query_plan['Startup Cost']
         self.total_cost = query_plan['Total Cost']
+        self.row_count = query_plan['Plan Rows']
+        self.output = query_plan['Output']
         self.children = [] 
-        self.row_count = 0 # placeholder
-        self.description = self.node_type + ": description" # placeholder
         
     def get_block_count(self): 
         return self.count / BLOCK_SIZE
@@ -56,7 +57,7 @@ class DB:
         self.statistics = {} # self.get_statistics()
 
     def get_query_plan(self, query: str): 
-        query_plan = self.execute("EXPLAIN (FORMAT JSON) " + query)[0][0][0][0]['Plan']
+        query_plan = self.execute("EXPLAIN (FORMAT JSON, VERBOSE TRUE, BUFFERS TRUE, ANALYZE TRUE) " + query)[0][0][0][0]['Plan']
         return query_plan
 
     def get_cpu_tuple_cost(self):
