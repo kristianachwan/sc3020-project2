@@ -59,9 +59,20 @@ class DB:
         query_plan = self.execute("EXPLAIN (FORMAT JSON) " + query)[0][0][0][0]['Plan']
         return query_plan
 
-    def get_query_plan_analysis(self, query: str): 
-        query_plan_analysis = self.execute("EXPLAIN ANALYZE " + query)
-        return query_plan_analysis 
+    def get_cpu_tuple_cost(self):
+        return float(self.execute("""
+                show cpu_tuple_cost;
+            """)[0][0][0])
+    
+    def get_cpu_seq_page_cost(self):
+        return float(self.execute("""
+                show cpu_seq_page_cost;
+            """)[0][0][0])
+    
+    def get_random_page_costs(self):
+        return float(self.execute("""
+                show random_page_costs;
+            """)[0][0][0])
 
     def execute(self, query: str):
         self.cursor.execute(query)
