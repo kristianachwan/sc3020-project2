@@ -1,17 +1,19 @@
 import psycopg2
 import graphviz
-import os
+import random
 from pprint import pp
-  
+
 BLOCK_SIZE = 128 # need to be researched to actually know how much is this
 
 class Node: 
     def __init__(self, query_plan): 
+        self.uuid = str(random.random())
         self.node_type = query_plan['Node Type']
+        self.startup_cost = query_plan['Startup Cost']
         self.total_cost = query_plan['Total Cost']
+        self.row_count = query_plan['Plan Rows']
+        self.output = query_plan['Output']
         self.children = [] 
-        self.row_count = 0 # placeholder
-        self.description = self.node_type + ": description" # placeholder
         
     def get_block_count(self): 
         return self.count / BLOCK_SIZE
@@ -22,7 +24,7 @@ class Node:
 class Graph:    
     def __init__(self, query_plan): 
         self.root = self.parse_query_plan(query_plan)
-
+    
     def parse_query_plan(self, query_plan):
         node = Node(query_plan)
         if 'Plans' in query_plan: 
@@ -39,9 +41,12 @@ class GraphVisualizer:
         self.graphviz.render('qep')
 
     def parse_graph(self, node):
+        self.graphviz.node(node.uuid, node.node_type)
+        
         if node.children: 
             for child in node.children: 
-                self.graphviz.edge(child.node_type, node.node_type)
+                self.graphviz.node(child.uuid, child.node_type)
+                self.graphviz.edge(child.uuid, node.uuid)
                 self.parse_graph(child)
 
 class DB: 
@@ -60,7 +65,7 @@ class DB:
         self.cursor = self.connection.cursor()
         
     def get_query_plan(self, query: str): 
-        query_plan = self.execute("EXPLAIN (FORMAT JSON) " + query)[0][0][0][0]['Plan']
+        query_plan = self.execute("EXPLAIN (FORMAT JSON, VERBOSE TRUE, BUFFERS TRUE, ANALYZE TRUE) " + query)[0][0][0][0]['Plan']
         return query_plan
 
     def get_cpu_tuple_cost(self):
