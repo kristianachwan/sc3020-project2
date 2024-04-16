@@ -12,8 +12,24 @@ class DB:
         self.password = config['password']
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
         self.cursor = self.connection.cursor()
-        self.statistics = {} # self.get_statistics()
-        self.cursor.execute("ANALYZE") # populate the statistics so that the pg_statistics catalog accessible
+        self.statistics = self.get_statistics()
+
+        # need to find a way to run it once
+        self.cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_stat_all_tables
+                    WHERE last_analyze IS NOT NULL OR last_autoanalyze IS NOT NULL
+                ) THEN
+                    RAISE NOTICE 'Running ANALYZE on all tables.';
+                    ANALYZE;
+                ELSE
+                    RAISE NOTICE 'ANALYZE has already been run on some tables.';
+                END IF;
+            END $$;
+        """) # populate the statistics so that the pg_statistics catalog accessible, but running it quite expensive so check first 
 
     def reset_connection(self):
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
@@ -42,12 +58,20 @@ class DB:
         return float(self.execute("""
                 show cpu_operator_cost;
             """)[0][0][0])
+
+    def get_table_statistics(self, table_name): 
+        query_results = self.execute("""
+            SELECT * FROM pg_class WHERE relname = '{table_name}';
+            """.format(table_name=table_name))
+
+        table_statistics = {} 
+        for column_value, column_name in zip(query_results[0][0], query_results[1]):
+            table_statistics[column_name] = column_value
+        return table_statistics
     
     def get_table_page_count(self, table_name): 
-        return float(self.execute("""
-            SELECT relpages FROM pg_class WHERE relname = '{table_name}';
-            """.format(table_name=table_name))[0][0][0])
-    
+        return self.statistics[table_name]['relpages']
+
     def execute(self, query: str):
         self.cursor.execute(query)
         column_names = [description[0] for description in self.cursor.description]
@@ -119,14 +143,7 @@ class DB:
     def get_statistics(self): 
         statistics = {} 
         for table_name in self.get_table_names(): 
-            table_statistics = {} 
-            table_statistics['row_count'] = self.get_row_count(table_name)
-            distinct_row_count = {} 
-            for column_name in self.get_column_names(table_name): 
-                distinct_row_count[column_name] = self.get_distinct_row_count(table_name, column_name)
-            
-            table_statistics['distinct_row_count'] = distinct_row_count 
-            statistics[table_name] = table_statistics 
+            statistics[table_name] = self.get_table_statistics(table_name)
         
         return statistics 
 
@@ -142,7 +159,6 @@ class Node:
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = [] 
         self.cost_description = self.get_cost_description() 
-        
         
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan': 
