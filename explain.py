@@ -139,7 +139,7 @@ class Node:
         self.total_cost = query_plan['Total Cost']
         self.row_count = query_plan['Plan Rows']
         self.output = query_plan['Output']
-        self.relation_name = query_plan['Relation Name']
+        self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = [] 
         self.cost_description = self.get_cost_description() 
         
