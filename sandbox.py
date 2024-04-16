@@ -24,15 +24,13 @@ db = DB({
 # graph = Graph(db.get_query_plan("SELECT * FROM nation;"))
 # graphviz = GraphVisualizer(graph)
 
-# pp(db.execute("""
-#     EXPLAIN (FORMAT JSON, VERBOSE TRUE, BUFFERS TRUE, ANALYZE TRUE) select * 
-#     FROM customer c 
-#     NATURAL JOIN nation
-#     LIMIT 100; 
-# """)[0][0][0][0]['Plan'])
+pp(db.execute("""
+    EXPLAIN (FORMAT JSON, VERBOSE TRUE, BUFFERS TRUE, ANALYZE TRUE) select * 
+    FROM customer c 
+    NATURAL JOIN nation
+    LIMIT 100; 
+""")[0][0][0][0]['Plan'])
 
-
-
-pp(db.get_cpu_seq_page_cost())
+pp(db.get_cpu_tuple_cost())
 pp(db.get_seq_page_cost())
 pp(db.get_random_page_cost())
