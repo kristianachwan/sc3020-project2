@@ -9,7 +9,8 @@ class Node:
         self.node_type = query_plan['Node Type']
         self.total_cost = query_plan['Total Cost']
         self.children = [] 
-        self.row_count = 0 
+        self.row_count = 0 # placeholder
+        self.description = self.node_type + ": description" # placeholder
         
     def get_block_count(self): 
         return self.count / BLOCK_SIZE
