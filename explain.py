@@ -55,6 +55,10 @@ class DB:
         self.cursor = self.connection.cursor()
         self.statistics = {} # self.get_statistics()
 
+    def reset_connection(self):
+        self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
+        self.cursor = self.connection.cursor()
+        
     def get_query_plan(self, query: str): 
         query_plan = self.execute("EXPLAIN (FORMAT JSON) " + query)[0][0][0][0]['Plan']
         return query_plan
