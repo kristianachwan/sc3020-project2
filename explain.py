@@ -14,7 +14,6 @@ class DB:
         self.cursor = self.connection.cursor()
         self.statistics = self.get_statistics()
 
-        # need to find a way to run it once
         self.cursor.execute("""
             DO $$
             BEGIN
