@@ -3,6 +3,7 @@ import graphviz
 import random
 from pprint import pp
 
+epsilon = 0.1
 class DB: 
     def __init__(self, config): 
         self.host = config['host']
@@ -74,6 +75,9 @@ class DB:
     
     def get_table_page_count(self, table_name): 
         return self.statistics[table_name]['relpages']
+    
+    def get_table_row_count(self, table_name): 
+        return self.statistics[table_name]['reltuples']
 
     def execute(self, query: str):
         self.cursor.execute(query)
@@ -107,28 +111,6 @@ class DB:
             table_names.append(table_name)
         return table_names
 
-    def get_distinct_row_count(self, table_name, column_name): 
-        query_results = self.execute(
-            """
-            SELECT 
-                COUNT(DISTINCT({column_name})) 
-                FROM {table_name}
-            """.format(column_name=column_name, table_name=table_name)
-        )
-
-        return query_results[0][0][0]
-    
-    def get_row_count(self, table_name: str): 
-        query_results = self.execute(
-            """
-            SELECT 
-                COUNT(*) 
-                FROM {table_name}
-            """.format(table_name=table_name)
-        )
-
-        return query_results[0][0][0]
-
     def get_column_names(self, table_name: str): 
         query_results = self.execute(
             """
@@ -137,6 +119,7 @@ class DB:
             WHERE t.table_name = '{table_name}'
             """.format(table_name=table_name)
         )
+        
         column_names = [] 
         for column_name, in query_results[0]: 
             column_names.append(column_name)
@@ -159,26 +142,28 @@ class Node:
         self.total_cost = query_plan['Total Cost']
         self.row_count = query_plan['Plan Rows']
         self.output = query_plan['Output']
+        self.filter = query_plan['Filter'] if 'Filter' in query_plan else ""
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = [] 
         self.cost_description = self.get_cost_description() 
         
     def get_cost_description(self): 
-        if self.node_type == 'Seq Scan': 
+        if self.node_type == 'Seq Scan':
+            if self.filter: 
+                return self.get_cost_description_sequential_scan_with_filter() 
             return self.get_cost_description_sequential_scan() 
         
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
     def get_cost_description_sequential_scan(self): 
         cpu_tuple_cost = self.db.get_cpu_tuple_cost()
-        cpu_operator_cost = 0
-        row_count = self.row_count
+        row_count = self.db.get_table_row_count(self.relation_name)
         seq_page_cost = self.db.get_seq_page_cost()
         page_count = self.db.get_table_page_count(self.relation_name)
         startup_cost = 0
-        run_cost = (cpu_tuple_cost + cpu_operator_cost) * row_count + seq_page_cost * page_count
-        total_cost = run_cost 
-        valid = total_cost == self.total_cost
+        run_cost = (cpu_tuple_cost) * row_count + seq_page_cost * page_count
+        total_cost = startup_cost + run_cost 
+        valid = abs(total_cost - self.total_cost) <= epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -191,12 +176,42 @@ class Node:
                                   = {startup_cost} + {run_cost}
                                   = {total_cost}
 
-            is it a valid calculation? {"YES" if valid else "NO"}
+            psql_total_cost = {self.total_cost}
+                                  
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
             {"" if valid else reason}
         """
 
         return description
     
+    def get_cost_description_sequential_scan_with_filter(self): 
+        cpu_tuple_cost = self.db.get_cpu_tuple_cost()
+        cpu_operator_cost = self.db.get_cpu_operator_cost()
+        row_count = self.db.get_table_row_count(self.relation_name)
+        seq_page_cost = self.db.get_seq_page_cost()
+        page_count = self.db.get_table_page_count(self.relation_name)
+        startup_cost = 0
+        run_cost = (cpu_tuple_cost + cpu_operator_cost) * row_count + seq_page_cost * page_count
+        total_cost = startup_cost + run_cost 
+        valid = abs(total_cost - self.total_cost) <= epsilon
+        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+
+        description = f"""
+            startup_cost = {startup_cost}
+            run_cost = cpu_run_cost + disk_run_cost 
+                     = (cpu_tuple_cost + cpu_operator_cost) * Ntuple + seq_page_cost * Npage
+                     = ({cpu_tuple_cost + cpu_operator_cost}) * {row_count} + {seq_page_cost} * {page_count}
+                     = {run_cost}
+            calculated_total_cost = startup_cost + run_cost 
+                                  = {startup_cost} + {run_cost}
+                                  = {total_cost}
+
+            psql_total_cost = {self.total_cost}
+
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            {"" if valid else reason}
+        """
+        return description
 class Graph:    
     def __init__(self, query_plan, db: DB): 
         self.db = db 
