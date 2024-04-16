@@ -21,7 +21,7 @@ db = DB({
 # pp(db.get_distinct_row_count('customer', 'c_nationkey'))
 # pp(db.get_column_names('customer'))
 # pp(db.statistics)
-graph = Graph(db.get_query_plan("SELECT * FROM customer c JOIN orders o ON o.o_custkey = c.c_custkey LIMIT 100;"))
+graph = Graph(db.get_query_plan("SELECT * FROM nation;"))
 graphviz = GraphVisualizer(graph)
 
 # pp(db.execute("""

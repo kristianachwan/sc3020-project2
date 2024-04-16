@@ -41,10 +41,11 @@ class GraphVisualizer:
         self.graphviz.render('qep')
 
     def parse_graph(self, node):
+        self.graphviz.node(node.uuid, node.node_type)
+        
         if node.children: 
             for child in node.children: 
                 self.graphviz.node(child.uuid, child.node_type)
-                self.graphviz.node(node.uuid, node.node_type)
                 self.graphviz.edge(child.uuid, node.uuid)
                 self.parse_graph(child)
 
