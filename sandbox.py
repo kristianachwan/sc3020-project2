@@ -1,11 +1,11 @@
 from explain import DB, Graph, GraphVisualizer
 from pprint import pp
 
-host = ""
-port = ""
-database = "" 
-user = ""
-password = "" 
+host = "0.tcp.ap.ngrok.io"
+port = "18539"
+database = "postgres" 
+user = "postgres"
+password = "sc3020ggez" 
 
 
 db = DB({

@@ -1,6 +1,7 @@
 import ttkbootstrap as ttk
 import tkinter as tk
 from tkinter import messagebox
+from explain import DB, Graph, GraphVisualizer
 import time
 
 TEXT_PRIMARY_COLOR = "#F9F9F9"
@@ -109,6 +110,24 @@ class QueryTable(ttk.Frame):
         """
 
 class SQLInput(ttk.Frame):
+    def __execute_query(self, event):
+        query = self.query_input.get("1.0", "end-1c")
+        print(query)
+        
+        try:
+            query_plan = self.master.master.master.master.inner_state.db_connection.get_query_plan(query) # forgive me
+        except:
+            messagebox.showerror("Error", "Invalid query")
+            return
+        
+        try:
+            graph = Graph(query_plan)
+            graphviz = GraphVisualizer(graph)
+
+            self.master.master.master.refresh_image()
+        except:
+            messagebox.showerror("Error", "An error has during the creation of the graph")
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
@@ -117,12 +136,13 @@ class SQLInput(ttk.Frame):
 
         self.execute_button = ttk.Button(self, text="Execute")
         self.execute_button.pack(side = ttk.BOTTOM, pady=4, padx = 8, anchor=ttk.S)
+        self.execute_button.bind("<Button-1>", self.__execute_query)
 
 
 class InnerState:
     # Define the global variables here
     def __init__(self):
-        self.logged_in = False
+        self.db_connection = None
 
 
 class App(ttk.Window):  
@@ -137,23 +157,27 @@ class App(ttk.Window):
     
     def __refresh_content_layout(self):
         self.content.pack_forget()
-        if self.inner_state.logged_in:
+        if self.inner_state.db_connection is not None:
             self.content = LayoutContent(self, borderwidth=2)
         else:
             self.content = LayoutContentNotLoggedIn(self, borderwidth=2, text="Content")
         self.content.pack(side = ttk.TOP, padx=8, pady = 4, fill="both", expand=True)
 
     def login(self, address, port, username, password):
-        # testing
-        if username == "postgres" and password == "postgres":
-            self.inner_state.logged_in = True
+        self.db_connection = None
+        try:
+            db_connection = DB({
+                "host": address, 
+                "port": port, 
+                "database": "postgres", # hard coded 
+                "user": username, 
+                "password": password
+            })
+            self.inner_state.db_connection = db_connection
             self.__refresh_content_layout()
-        else:
-            self.inner_state.logged_in = False
+        except:
             self.__refresh_content_layout()
             messagebox.showerror("Error", "Invalid username or password")
-        
-        
         
     def generate_layout(self):
         # Header that contains the input to the database connection
@@ -184,16 +208,16 @@ class LayoutHeader(ttk.Labelframe):
         self.inner_frame = ttk.Frame(self)
         self.inner_frame.pack(pady = 8, padx = 8, fill="both")
 
-        self.address_entry = InputWithLabel(self.inner_frame, placeholder="Address", label_text="Database Address")
+        self.address_entry = InputWithLabel(self.inner_frame, placeholder="Address", label_text="Database Address", default_value="0.tcp.ap.ngrok.io")
         self.address_entry.pack(side = ttk.LEFT, padx = 8)
 
-        self.port_entry = InputWithLabel(self.inner_frame, placeholder="Port", label_text = "Database Port", default_value="5432")
+        self.port_entry = InputWithLabel(self.inner_frame, placeholder="Port", label_text = "Database Port", default_value="18539")
         self.port_entry.pack(side = ttk.LEFT, padx = 8)
 
         self.user_entry = InputWithLabel(self.inner_frame, placeholder="User", default_value="postgres", label_text="Database User")
         self.user_entry.pack(side = ttk.LEFT, padx = 8)
 
-        self.password_entry = InputWithLabel(self.inner_frame, show="*", placeholder="Password", label_text="Database Password")
+        self.password_entry = InputWithLabel(self.inner_frame, show="*", placeholder="Password", label_text="Database Password", default_value="sc3020ggez")
         self.password_entry.pack(side = ttk.LEFT, padx = 8)
 
         self.connect_button = ttk.Button(self.inner_frame, text="Connect")
@@ -208,6 +232,11 @@ class LayoutContentNotLoggedIn(ttk.LabelFrame):
         self.label.pack(side = ttk.TOP, fill="both", expand=True)
 
 class LayoutContent(ttk.Frame):
+    def refresh_image(self):
+        self.graph_image = ttk.PhotoImage(file="./qep.png")
+        self.graph_image_label.configure(image=self.graph_image)
+        self.graph_image_label.image = self.graph_image
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()

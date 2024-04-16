@@ -1,5 +1,6 @@
 import psycopg2
 import graphviz
+import os
 from pprint import pp
   
 BLOCK_SIZE = 128 # need to be researched to actually know how much is this
@@ -31,11 +32,11 @@ class Graph:
         return node 
     
 class GraphVisualizer: 
-    def __init__(self, graph): 
-        self.graphviz = graphviz.Digraph('G', filename='qep')
+    def __init__(self, graph):
+        self.graphviz = graphviz.Digraph('G', filename='qep', format='png')
         self.graphviz.attr(rankdir='BT')
         self.parse_graph(graph.root)
-        self.graphviz.view() 
+        self.graphviz.render('qep')
 
     def parse_graph(self, node):
         if node.children: 
