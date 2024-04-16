@@ -2,6 +2,7 @@ import psycopg2
 import graphviz
 import random
 from pprint import pp
+import math
 
 # this is permissible error from the estimation
 epsilon = 0.1
@@ -213,6 +214,36 @@ class Node:
             {"" if valid else reason}
         """
         return description
+    
+    def get_sort_cost_description(self):
+        cpu_operator_cost = self.db.get_cpu_operator_cost() # if this doesn't work then the default value is 0.0025
+        comparison_cost = 2 * cpu_operator_cost
+        sort_tuples = 240 # this is some random constant value. Need to write a function to fetch from the scan operator cost calc function. 
+        log_sort_tuples = math.log2(sort_tuples)
+
+        last_scan_cost = 13.485 # this is some random constant value. Need to write a function to fetch from the scan operator cost calc function. 
+        
+        startup_cost = last_scan_cost + comparison_cost * sort_tuples * log_sort_tuples
+        run_cost = cpu_operator_cost * sort_tuples
+        total_cost = startup_cost + run_cost
+        
+        # Confirmation values from EXPLAIN command
+        psql_total_cost = self.total_cost  
+        epsilon = 0.1
+        valid = abs(total_cost - psql_total_cost) <= epsilon
+        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+
+        description = f"""
+            startup_cost = {startup_cost}
+            run_cost = {cpu_operator_cost} * {sort_tuples} = {run_cost}
+            total_cost = startup_cost + run_cost = {total_cost}
+            PostgreSQL total_cost = {psql_total_cost}
+            Valid calculation? {"Yes" if valid else "No"}
+            {"" if valid else reason}
+        """
+
+        return description
+    
 class Graph:    
     def __init__(self, query_plan, db: DB): 
         self.db = db 
