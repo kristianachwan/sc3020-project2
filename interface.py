@@ -160,16 +160,16 @@ class SQLInput(ttk.Frame):
             reset_connection()
             return
         
-        #try:
-        graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection)
-        self.master.master.master.master.inner_state.graph = graph
+        try:
+            graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection)
+            self.master.master.master.master.inner_state.graph = graph
 
-        graphviz = GraphVisualizer(graph)
+            graphviz = GraphVisualizer(graph)
 
-        self.master.master.master.refresh_query_content()
-        #except Exception as e:
-        #    messagebox.showerror("Error", str(e))
-        #    reset_connection()
+            self.master.master.master.refresh_query_content()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            reset_connection()
             
         self.master.master.master.query_explanation.update_treeview(None)
     
