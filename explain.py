@@ -42,7 +42,7 @@ class GraphVisualizer:
 
     def parse_graph(self, node):
         self.graphviz.node(node.uuid, node.node_type)
-        
+
         if node.children: 
             for child in node.children: 
                 self.graphviz.node(child.uuid, child.node_type)
@@ -73,14 +73,14 @@ class DB:
                 show cpu_tuple_cost;
             """)[0][0][0])
     
-    def get_cpu_seq_page_cost(self):
+    def get_seq_page_cost(self):
         return float(self.execute("""
-                show cpu_seq_page_cost;
+                show seq_page_cost;
             """)[0][0][0])
     
-    def get_random_page_costs(self):
+    def get_random_page_cost(self):
         return float(self.execute("""
-                show random_page_costs;
+                show random_page_cost;
             """)[0][0][0])
 
     def execute(self, query: str):

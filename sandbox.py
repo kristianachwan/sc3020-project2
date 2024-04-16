@@ -21,8 +21,8 @@ db = DB({
 # pp(db.get_distinct_row_count('customer', 'c_nationkey'))
 # pp(db.get_column_names('customer'))
 # pp(db.statistics)
-graph = Graph(db.get_query_plan("SELECT * FROM nation;"))
-graphviz = GraphVisualizer(graph)
+# graph = Graph(db.get_query_plan("SELECT * FROM nation;"))
+# graphviz = GraphVisualizer(graph)
 
 # pp(db.execute("""
 #     EXPLAIN (FORMAT JSON, VERBOSE TRUE, BUFFERS TRUE, ANALYZE TRUE) select * 
@@ -32,3 +32,7 @@ graphviz = GraphVisualizer(graph)
 # """)[0][0][0][0]['Plan'])
 
 
+
+pp(db.get_cpu_seq_page_cost())
+pp(db.get_seq_page_cost())
+pp(db.get_random_page_cost())
