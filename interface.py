@@ -143,6 +143,7 @@ class InnerState:
     # Define the global variables here
     def __init__(self):
         self.db_connection = None
+        self.graph = None
 
 
 class App(ttk.Window):  
@@ -266,7 +267,7 @@ class LayoutContent(ttk.Frame):
         self.query_result_frame = ttk.LabelFrame(self.first_row, borderwidth=2, text="Physical Query Plan")
         self.query_result_frame.pack(side = ttk.LEFT, fill="both", pady=4, expand=True)
 
-        self.graph_image = ttk.PhotoImage(file="./download.png")
+        self.graph_image = None
         self.graph_image_label = ttk.Label(self.query_result_frame, image=self.graph_image)
         self.graph_image_label.pack(side = ttk.TOP, pady=4, padx = 8, expand=True)
 
