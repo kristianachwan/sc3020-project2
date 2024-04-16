@@ -111,20 +111,40 @@ class QueryTable(ttk.Frame):
 
 class SQLInput(ttk.Frame):
     def __execute_query(self, event):
+        db: DB = self.master.master.master.master.inner_state.db_connection
+        def reset_connection():
+            try:
+                db.reset_connection()
+            except:
+                messagebox.showerror("Error", "An error when resetting the connection")
+                self.master.master.master.master.inner_state.db_connection = None
+
+                # Refresh
+                self.master.master.master.master.refresh_content_layout()
+                return
+            
         query = self.query_input.get("1.0", "end-1c")
         print(query)
+        
+        if db.is_query_valid(query)[0] is False:
+            messagebox.showerror("Error", "Invalid query")
+            reset_connection()
+            return 
+        
         
         try:
             query_plan = self.master.master.master.master.inner_state.db_connection.get_query_plan(query) # forgive me
         except:
-            messagebox.showerror("Error", "Invalid query")
+            messagebox.showerror("Error", "An error has occured during the execution of the query")
+            reset_connection()
             return
         
         try:
             graph = Graph(query_plan)
+            self.master.master.master.master.inner_state.graph = graph
             graphviz = GraphVisualizer(graph)
 
-            self.master.master.master.refresh_image()
+            self.master.master.master.refresh_query_content()
         except:
             messagebox.showerror("Error", "An error has during the creation of the graph")
     
@@ -156,13 +176,15 @@ class App(ttk.Window):
         self.inner_state = inner_state
         self.generate_layout()
     
-    def __refresh_content_layout(self):
+    def refresh_content_layout(self):
+        # Used to re-render the entirety of the content layout to its default state
         self.content.pack_forget()
         if self.inner_state.db_connection is not None:
             self.content = LayoutContent(self, borderwidth=2)
         else:
             self.content = LayoutContentNotLoggedIn(self, borderwidth=2, text="Content")
         self.content.pack(side = ttk.TOP, padx=8, pady = 4, fill="both", expand=True)
+
 
     def login(self, address, port, username, password):
         self.db_connection = None
@@ -175,9 +197,9 @@ class App(ttk.Window):
                 "password": password
             })
             self.inner_state.db_connection = db_connection
-            self.__refresh_content_layout()
+            self.refresh_content_layout()
         except:
-            self.__refresh_content_layout()
+            self.refresh_content_layout()
             messagebox.showerror("Error", "Invalid username or password")
         
     def generate_layout(self):
@@ -233,10 +255,13 @@ class LayoutContentNotLoggedIn(ttk.LabelFrame):
         self.label.pack(side = ttk.TOP, fill="both", expand=True)
 
 class LayoutContent(ttk.Frame):
-    def refresh_image(self):
+    def refresh_query_content(self):
+        # To be used after a new query
         self.graph_image = ttk.PhotoImage(file="./qep.png")
         self.graph_image_label.configure(image=self.graph_image)
         self.graph_image_label.image = self.graph_image
+
+        # Refresh treeview explanation
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
