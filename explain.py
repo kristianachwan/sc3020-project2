@@ -14,6 +14,10 @@ class DB:
         self.cursor = self.connection.cursor()
         self.statistics = self.get_statistics()
 
+        """ 
+        Execute Analyze command if for all tables, the analyze or autoanalyze have never been done for each table. 
+        This can be done safely because the data is static for this project (There is no Upsert operation). 
+        """
         self.cursor.execute("""
             DO $$
             BEGIN
@@ -28,7 +32,7 @@ class DB:
                     RAISE NOTICE 'ANALYZE has already been run on some tables.';
                 END IF;
             END $$;
-        """) # populate the statistics so that the pg_statistics catalog accessible, but running it quite expensive so check first 
+        """) 
 
     def reset_connection(self):
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
