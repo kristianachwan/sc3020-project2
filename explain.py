@@ -139,14 +139,18 @@ class Node:
         self.total_cost = query_plan['Total Cost']
         self.row_count = query_plan['Plan Rows']
         self.output = query_plan['Output']
-        self.relation_name = query_plan['Relation Name']
-        self.children = [] 
-        self.cost_description = self.get_cost_description() 
-        
+        self.relation_name = query_plan.get('Relation Name', None)
+        self.peak_memory_usage = query_plan.get('Peak Memory Usage', 0)
+        self.children = []         
         
     def get_cost_description(self): 
+        print(self.node_type)
         if self.node_type == 'Seq Scan': 
             return self.get_cost_description_sequential_scan() 
+        elif self.node_type == "Hash Join":
+            return self.get_cost_description_hash_join()
+        elif self.node_type == "Hash":
+            return self.get_cost_description_hash()
         
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
@@ -175,13 +179,34 @@ class Node:
             is it a valid calculation? {"YES" if valid else "NO"}
             {"" if valid else reason}
         """
+        print(description)
+        return description
+    
+    def get_cost_description_hash(self): 
+        total_cost = self.children[0].total_cost
+        valid = total_cost == self.total_cost
+        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
+        description = f"""
+            Cost: {total_cost} From what we observed in Postgres EXPLAIN, cost for Hash are passed so we will do the same.
+            is it a valid calculation? {"YES" if valid else "NO"}
+            {"" if valid else reason}
+        """
+        print(description)
+        return description
+    
+    def get_cost_description_hash_join(self): 
+        description = f"""
+            Hash
+        """
+        print(description)
         return description
     
 class Graph:    
     def __init__(self, query_plan, db: DB): 
         self.db = db 
         self.root = self.parse_query_plan(query_plan)
+        self.calculate_cost()
     
     def parse_query_plan(self, query_plan):
         node = Node(query_plan, self.db)
@@ -189,7 +214,23 @@ class Graph:
             for child_query_plan in query_plan['Plans']: 
                 node.children.append(self.parse_query_plan(child_query_plan)) 
 
-        return node 
+        return node
+    
+    def calculate_cost(self):
+        # Start DFS traversal from the root node
+        self.dfs(self.root)
+
+    def dfs(self, node):
+        if node is None:
+            return
+
+        # Recursively call dfs on each child node
+        for child in node.children:
+            self.dfs(child)
+
+        # Perform get_cost_description on the current node
+        node.get_cost_description()
+
     
 class GraphVisualizer: 
     def __init__(self, graph):
