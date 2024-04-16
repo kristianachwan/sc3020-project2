@@ -3,6 +3,7 @@ import graphviz
 import random
 from pprint import pp
 
+# this is permissible error from the estimation
 epsilon = 0.1
 class DB: 
     def __init__(self, config): 
