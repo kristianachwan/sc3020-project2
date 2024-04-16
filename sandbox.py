@@ -2,11 +2,10 @@ from explain import DB, Graph, GraphVisualizer
 from pprint import pp
 
 host = "0.tcp.ap.ngrok.io"
-port = "18539"
+port = "15062"
 database = "postgres" 
 user = "postgres"
 password = "sc3020ggez" 
-
 
 db = DB({
     "host": host, 
@@ -21,16 +20,23 @@ db = DB({
 # pp(db.get_distinct_row_count('customer', 'c_nationkey'))
 # pp(db.get_column_names('customer'))
 # pp(db.statistics)
-# graph = Graph(db.get_query_plan("SELECT * FROM nation;"))
+graph = Graph(db.get_query_plan("SELECT * FROM nation;"), db)
+print(graph.root.cost_description)
 # graphviz = GraphVisualizer(graph)
 
-pp(db.execute("""
-    EXPLAIN (FORMAT JSON, VERBOSE TRUE, BUFFERS TRUE, ANALYZE TRUE) select * 
-    FROM customer c 
-    NATURAL JOIN nation
-    LIMIT 100; 
-""")[0][0][0][0]['Plan'])
+# pp(db.execute("""
+#     EXPLAIN (FORMAT JSON, VERBOSE TRUE, BUFFERS TRUE, ANALYZE TRUE) select * 
+#     FROM customer c 
+#     NATURAL JOIN nation
+# """)[0][0][0][0]['Plan'])
 
-pp(db.get_cpu_tuple_cost())
-pp(db.get_seq_page_cost())
-pp(db.get_random_page_cost())
+# pp(db.execute("""
+#     EXPLAIN (FORMAT JSON, VERBOSE TRUE, BUFFERS TRUE, ANALYZE TRUE) 
+#     SELECT * 
+#     FROM nation;
+# """)[0][0][0][0]['Plan'])
+
+
+# pp(db.get_cpu_tuple_cost())
+# pp(db.get_seq_page_cost())
+# pp(db.get_random_page_cost())
