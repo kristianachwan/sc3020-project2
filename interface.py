@@ -161,14 +161,10 @@ class SQLInput(ttk.Frame):
             return
         
         #try:
-        print('x')
         graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection)
-        print('z')
         self.master.master.master.master.inner_state.graph = graph
 
-        print('a')
         graphviz = GraphVisualizer(graph)
-        print('b')
 
         self.master.master.master.refresh_query_content()
         #except Exception as e:
