@@ -1,5 +1,6 @@
 import ttkbootstrap as ttk
 import tkinter as tk
+from ttkbootstrap.scrolled import ScrolledFrame
 from tkinter import messagebox
 from explain import DB, Graph, GraphVisualizer, Node
 import time
@@ -58,7 +59,7 @@ class InputWithLabel(ttk.Frame):
 
         self.entry = Input(self, placeholder=placeholder, default_value=default_value, show=show, )
         self.entry.pack(side = ttk.TOP)         
-
+        
 
 ### CONTENT SUBLAYOUTS ###
 class QueryExplanation(ttk.Frame):
@@ -116,21 +117,68 @@ class QueryTable(ttk.Frame):
         super().__init__(*args, **kwargs)
         self.pack()
 
-        self.notebook = ttk.Notebook(self)
-        self.notebook.pack(side = ttk.TOP, fill="both", expand=True)
-
-        self.query_table = ttk.Frame(self.notebook, width=480, height=480)
-        self.query_table.pack(fill="y")
-
-        self.schema_table = ttk.Frame(self.notebook, width=480, height=480)
-        self.schema_table.pack(fill="y")
-
-        self.notebook.add(self.query_table, text="Query Statistics")
-        self.notebook.add(self.schema_table, text="Schemas")
         """
         self
-        |-> query_table (several entries)
+        |-> notebook
+            |-> query_table
+            |-> schema_table
         """
+
+        self.notebook = ttk.Notebook(self, height=1000)
+        self.notebook.pack(side = ttk.TOP, fill="both", expand=True)
+
+        self.query_table = ttk.Frame(self.notebook, width=480, height=1000)
+        self.query_table.pack(fill="y")
+        db_con: DB = self.master.master.master.inner_state.db_connection
+        statistic = db_con.get_statistics()
+
+        # Generate table for Relation Statistics
+        header = ["relname", "relpages", "reltuples", "relhasindex"]
+        content = []
+        for val in statistic.values():
+            content.append([val[header_keys] for header_keys in header])
+
+        self.table = ttk.Treeview(self.query_table, columns=header, show="headings")
+        self.table.pack(fill="both", expand=True)
+        self.table.heading("#0", text="")
+        self.table.heading("#1", text="Name")
+        self.table.column("#1", width=40, anchor=tk.W)
+        self.table.heading("#2", text="No. of Pages")
+        self.table.column("#2", width=40, anchor=tk.W)
+        self.table.heading("#3", text="No. of Tuples")
+        self.table.column("#3", width=40, anchor=tk.W)
+        self.table.heading("#4", text="Has Index")
+        self.table.column("#4", width=25, anchor=tk.W)
+
+        for row in content:
+            self.table.insert("", "end", values=row)
+
+        # Generate table for Schemas
+        relations = db_con.get_table_names()
+        
+        self.schema_table_frame = ttk.Frame(self.notebook, width=480, height=1000)
+        self.schema_table_frame.pack(fill="y")
+
+        self.schema_table = ttk.Treeview(self.schema_table_frame, columns=["Relation", "Column"], show="tree headings")
+        self.schema_table.pack(fill="both", expand=True)
+
+        self.schema_table.column("#0", width=1, anchor=tk.W)
+        self.schema_table.heading("#1", text="Relation")
+        self.schema_table.column("#1", width=15, anchor=tk.W)
+        self.schema_table.heading("#2", text="Column")
+        self.schema_table.column("#2", width=40, anchor=tk.W)
+
+        for relation in relations:
+            columns = db_con.get_column_names(relation)
+            par = self.schema_table.insert("", "end", values=[relation, ""])
+            for column in columns:
+                self.schema_table.insert(par, "end", values=["", column])
+
+
+        self.notebook.add(self.query_table, text="Statistics")
+        self.notebook.add(self.schema_table_frame, text="Schemas")
+
+        
 
 class SQLInput(ttk.Frame):
     def __execute_query(self, event):
@@ -206,7 +254,7 @@ class LayoutHeader(ttk.Labelframe):
         self.address_entry = InputWithLabel(self.inner_frame, placeholder="Address", label_text="Database Address", default_value="0.tcp.ap.ngrok.io")
         self.address_entry.pack(side = ttk.LEFT, padx = 8)
 
-        self.port_entry = InputWithLabel(self.inner_frame, placeholder="Port", label_text = "Database Port", default_value="15062")
+        self.port_entry = InputWithLabel(self.inner_frame, placeholder="Port", label_text = "Database Port", default_value="16206")
         self.port_entry.pack(side = ttk.LEFT, padx = 8)
 
         self.user_entry = InputWithLabel(self.inner_frame, placeholder="User", default_value="postgres", label_text="Database User")
