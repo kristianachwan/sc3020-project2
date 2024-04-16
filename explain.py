@@ -3,6 +3,8 @@ import graphviz
 import random
 from pprint import pp
 
+# this is permissible error from the estimation
+epsilon = 0.1
 class DB: 
     def __init__(self, config): 
         self.host = config['host']
@@ -12,8 +14,27 @@ class DB:
         self.password = config['password']
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
         self.cursor = self.connection.cursor()
-        self.statistics = {} # self.get_statistics()
-        self.cursor.execute("ANALYZE") # populate the statistics so that the pg_statistics catalog accessible
+        self.statistics = self.get_statistics()
+
+        """ 
+        Execute Analyze command if for all tables, the analyze or autoanalyze have never been done for each table. 
+        This can be done safely because the data is static for this project (There is no Upsert operation). 
+        """
+        self.cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_stat_all_tables
+                    WHERE last_analyze IS NOT NULL OR last_autoanalyze IS NOT NULL
+                ) THEN
+                    RAISE NOTICE 'Running ANALYZE on all tables.';
+                    ANALYZE;
+                ELSE
+                    RAISE NOTICE 'ANALYZE has already been run on some tables.';
+                END IF;
+            END $$;
+        """) 
 
     def reset_connection(self):
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
@@ -42,12 +63,23 @@ class DB:
         return float(self.execute("""
                 show cpu_operator_cost;
             """)[0][0][0])
+
+    def get_table_statistics(self, table_name): 
+        query_results = self.execute("""
+            SELECT * FROM pg_class WHERE relname = '{table_name}';
+            """.format(table_name=table_name))
+
+        table_statistics = {} 
+        for column_value, column_name in zip(query_results[0][0], query_results[1]):
+            table_statistics[column_name] = column_value
+        return table_statistics
     
     def get_table_page_count(self, table_name): 
-        return float(self.execute("""
-            SELECT relpages FROM pg_class WHERE relname = '{table_name}';
-            """.format(table_name=table_name))[0][0][0])
+        return self.statistics[table_name]['relpages']
     
+    def get_table_row_count(self, table_name): 
+        return self.statistics[table_name]['reltuples']
+
     def execute(self, query: str):
         self.cursor.execute(query)
         column_names = [description[0] for description in self.cursor.description]
@@ -80,28 +112,6 @@ class DB:
             table_names.append(table_name)
         return table_names
 
-    def get_distinct_row_count(self, table_name, column_name): 
-        query_results = self.execute(
-            """
-            SELECT 
-                COUNT(DISTINCT({column_name})) 
-                FROM {table_name}
-            """.format(column_name=column_name, table_name=table_name)
-        )
-
-        return query_results[0][0][0]
-    
-    def get_row_count(self, table_name: str): 
-        query_results = self.execute(
-            """
-            SELECT 
-                COUNT(*) 
-                FROM {table_name}
-            """.format(table_name=table_name)
-        )
-
-        return query_results[0][0][0]
-
     def get_column_names(self, table_name: str): 
         query_results = self.execute(
             """
@@ -110,6 +120,7 @@ class DB:
             WHERE t.table_name = '{table_name}'
             """.format(table_name=table_name)
         )
+        
         column_names = [] 
         for column_name, in query_results[0]: 
             column_names.append(column_name)
@@ -119,14 +130,7 @@ class DB:
     def get_statistics(self): 
         statistics = {} 
         for table_name in self.get_table_names(): 
-            table_statistics = {} 
-            table_statistics['row_count'] = self.get_row_count(table_name)
-            distinct_row_count = {} 
-            for column_name in self.get_column_names(table_name): 
-                distinct_row_count[column_name] = self.get_distinct_row_count(table_name, column_name)
-            
-            table_statistics['distinct_row_count'] = distinct_row_count 
-            statistics[table_name] = table_statistics 
+            statistics[table_name] = self.get_table_statistics(table_name)
         
         return statistics 
 
@@ -139,31 +143,31 @@ class Node:
         self.total_cost = query_plan['Total Cost']
         self.row_count = query_plan['Plan Rows']
         self.output = query_plan['Output']
-        self.relation_name = query_plan.get('Relation Name', None)
-        self.peak_memory_usage = query_plan.get('Peak Memory Usage', 0)
-        self.children = []         
+        self.filter = query_plan['Filter'] if 'Filter' in query_plan else ""
+        self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
+        self.children = [] 
+        #self.cost_description = self.get_cost_description() 
         
     def get_cost_description(self): 
-        print(self.node_type)
-        if self.node_type == 'Seq Scan': 
-            return self.get_cost_description_sequential_scan() 
-        elif self.node_type == "Hash Join":
-            return self.get_cost_description_hash_join()
-        elif self.node_type == "Hash":
-            return self.get_cost_description_hash()
-        
-        return 'Unfortunately, the portion of operation is beyond the scope of this project...'
+        if self.node_type == 'Seq Scan':
+            if self.filter: 
+                desc = self.get_cost_description_sequential_scan_with_filter() 
+            desc = self.get_cost_description_sequential_scan() 
+        elif self.node_type == 'Hash':
+            desc = self.get_cost_description_hash() 
+        else:
+            desc = 'Unfortunately, the portion of operation is beyond the scope of this project...'
+        print (f"{self.node_type} {desc}")
     
     def get_cost_description_sequential_scan(self): 
         cpu_tuple_cost = self.db.get_cpu_tuple_cost()
-        cpu_operator_cost = 0
-        row_count = self.row_count
+        row_count = self.db.get_table_row_count(self.relation_name)
         seq_page_cost = self.db.get_seq_page_cost()
         page_count = self.db.get_table_page_count(self.relation_name)
         startup_cost = 0
-        run_cost = (cpu_tuple_cost + cpu_operator_cost) * row_count + seq_page_cost * page_count
-        total_cost = run_cost 
-        valid = total_cost == self.total_cost
+        run_cost = (cpu_tuple_cost) * row_count + seq_page_cost * page_count
+        total_cost = startup_cost + run_cost 
+        valid = abs(total_cost - self.total_cost) <= epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -176,30 +180,50 @@ class Node:
                                   = {startup_cost} + {run_cost}
                                   = {total_cost}
 
-            is it a valid calculation? {"YES" if valid else "NO"}
+            psql_total_cost = {self.total_cost}
+                                  
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
             {"" if valid else reason}
         """
-        print(description)
+
+        return description
+    
+    def get_cost_description_sequential_scan_with_filter(self): 
+        cpu_tuple_cost = self.db.get_cpu_tuple_cost()
+        cpu_operator_cost = self.db.get_cpu_operator_cost()
+        row_count = self.db.get_table_row_count(self.relation_name)
+        seq_page_cost = self.db.get_seq_page_cost()
+        page_count = self.db.get_table_page_count(self.relation_name)
+        startup_cost = 0
+        run_cost = (cpu_tuple_cost + cpu_operator_cost) * row_count + seq_page_cost * page_count
+        total_cost = startup_cost + run_cost 
+        valid = abs(total_cost - self.total_cost) <= epsilon
+        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+
+        description = f"""
+            startup_cost = {startup_cost}
+            run_cost = cpu_run_cost + disk_run_cost 
+                     = (cpu_tuple_cost + cpu_operator_cost) * Ntuple + seq_page_cost * Npage
+                     = ({cpu_tuple_cost + cpu_operator_cost}) * {row_count} + {seq_page_cost} * {page_count}
+                     = {run_cost}
+            calculated_total_cost = startup_cost + run_cost 
+                                  = {startup_cost} + {run_cost}
+                                  = {total_cost}
+
+            psql_total_cost = {self.total_cost}
+
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            {"" if valid else reason}
+        """
         return description
     
     def get_cost_description_hash(self): 
         total_cost = self.children[0].total_cost
-        valid = total_cost == self.total_cost
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
-            Cost: {total_cost} From what we observed in Postgres EXPLAIN, cost for Hash are passed so we will do the same.
-            is it a valid calculation? {"YES" if valid else "NO"}
-            {"" if valid else reason}
+            As observed in PostgresSQL Hash cost are passed hence we will do the same.
         """
-        print(description)
-        return description
-    
-    def get_cost_description_hash_join(self): 
-        description = f"""
-            Hash
-        """
-        print(description)
         return description
     
 class Graph:    
