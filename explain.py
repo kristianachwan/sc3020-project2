@@ -237,7 +237,6 @@ class Node:
         
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        epsilon = 0.1
         valid = abs(total_cost - psql_total_cost) <= epsilon
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
@@ -249,7 +248,6 @@ class Node:
             Valid calculation? {"Yes" if valid else "No"}
             {"" if valid else reason}
         """
-
         return description
     
     # Sort merge join cost = start_up cost + run cost
@@ -257,19 +255,24 @@ class Node:
     # run cost = num_input_tuples_rel_in + num_input_tuples_rel_out
     def get_sort_merge_join_description(self):
         # compare sizes of 2 input relations. Smaller relation is rel_out and larger relation is rel_in
+        if self.children[0].row_count < self.children[1].row_count:
+            rel_inner = self.children[1]
+            rel_outer = self.children[0]
+        else:
+            rel_inner = self.children[0]
+            rel_outer = self.children[1]
 
         # need to define a function to fetch number of tuples from the can of rel_out and rel_in
-        num_input_tuples_rel_out = 12
-        num_input_tuples_rel_in = 12
+        num_input_tuples_rel_out = rel_outer.row_count
+        num_input_tuples_rel_in = rel_inner.row_count
 
-        startup_cost = num_input_tuples_rel_out*math.log2(num_input_tuples_rel_in) +            num_input_tuples_rel_in*math.log2(num_input_tuples_rel_out)
+        startup_cost = num_input_tuples_rel_out*math.log2(num_input_tuples_rel_in) + num_input_tuples_rel_in*math.log2(num_input_tuples_rel_out)
 
         run_cost = num_input_tuples_rel_in + num_input_tuples_rel_out
         total_cost = startup_cost + run_cost
         
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        epsilon = 0.1
         valid = abs(total_cost - psql_total_cost) <= epsilon
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
@@ -281,7 +284,6 @@ class Node:
             Valid calculation? {"Yes" if valid else "No"}
             {"" if valid else reason}
         """
-
         return description
     
 class Graph:    
