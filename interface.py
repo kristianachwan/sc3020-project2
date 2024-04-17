@@ -1,12 +1,14 @@
 import ttkbootstrap as ttk
 import tkinter as tk
+from ttkbootstrap.scrolled import ScrolledFrame
 from tkinter import messagebox
-from explain import DB, Graph, GraphVisualizer
+from explain import DB, Graph, GraphVisualizer, Node
 import time
 
 TEXT_PRIMARY_COLOR = "#F9F9F9"
 TEXT_SECONDARY_COLOR = "grey"
 
+### COMPONENTS ###
 class Input(ttk.Entry):
     def __init__(self, master=None, placeholder="", default_value=None, **kwargs):
         self.is_empty = True
@@ -56,13 +58,33 @@ class InputWithLabel(ttk.Frame):
         self.label.pack(side = ttk.TOP, fill="x")
 
         self.entry = Input(self, placeholder=placeholder, default_value=default_value, show=show, )
-        self.entry.pack(side = ttk.TOP)
-            
+        self.entry.pack(side = ttk.TOP)         
+        
 
+### CONTENT SUBLAYOUTS ###
 class QueryExplanation(ttk.Frame):
+
+    def __recursive_update(self, node: Node, parent):
+        def callback(event):
+            self.selected_node = node
+            self.query_explanation.config(text=node.cost_description)
+
+        curnode = self.query_selection_tree.insert(parent, "end", text=node.node_type, values=(node.total_cost, node.row_count), tags=(node.node_type, node.uuid))
+        self.query_selection_tree.tag_bind(node.uuid, "<<TreeviewSelect>>", callback=callback)
+        for child in node.children:
+            self.__recursive_update(child, curnode)
+
+    def update_treeview(self, event):
+
+        root: Node = self.master.master.master.master.inner_state.graph.root
+        self.query_selection_tree.delete(*self.query_selection_tree.get_children())
+        self.__recursive_update(root, "")
+
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack(expand=True, fill="both")
+        self.selected_node = None
         """
         self
         |-> query_selection_frame
@@ -74,22 +96,12 @@ class QueryExplanation(ttk.Frame):
         self.query_selection_frame = ttk.Frame(self, width=5)
         self.query_selection_frame.pack(side = ttk.LEFT, fill="y", padx=(0, 16))
 
-        self.query_selection_tree = ttk.Treeview(self.query_selection_frame, columns=("cost"), height=50)
+        self.query_selection_tree = ttk.Treeview(self.query_selection_frame, columns=("cost", "rows"), height=50)
         self.query_selection_tree.heading("#0", text="Query Plan")
         self.query_selection_tree.heading("#1", text="Cost")
-        self.query_selection_tree.column("#0", width=125)
-        self.query_selection_tree.column("#1", width=50)
-
-        # Example data
-        node1 = self.query_selection_tree.insert("", "end", text="Index Scan", values=("100"), tags=("index_scan"))
-        node2 = self.query_selection_tree.insert("", "end", text="Seq Scan", values=("200"), tags=("seq_scan"))
-        node3 = self.query_selection_tree.insert(node1, "end", text="Hash Join", values=("200"), tags=("hash_join"))
+        self.query_selection_tree.heading("#2", text="Rows")
         
         # Onclick event (based on tags)
-        self.query_selection_tree.tag_bind("index_scan", "<<TreeviewSelect>>", callback = lambda event: self.query_explanation.config(text="Index Scan Explanation"))
-        self.query_selection_tree.tag_bind("seq_scan", "<<TreeviewSelect>>", callback = lambda event: self.query_explanation.config(text="Seq Scan Explanation"))
-        self.query_selection_tree.tag_bind("hash_join", "<<TreeviewSelect>>", callback = lambda event: self.query_explanation.config(text="Hash Join Explanation"))
-
         self.query_selection_tree.pack(side = ttk.LEFT, fill="y")
 
         self.query_explanation_frame = ttk.Frame(self)
@@ -104,10 +116,69 @@ class QueryTable(ttk.Frame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
+
         """
         self
-        |-> query_table (several entries)
+        |-> notebook
+            |-> query_table
+            |-> schema_table
         """
+
+        self.notebook = ttk.Notebook(self, height=1000)
+        self.notebook.pack(side = ttk.TOP, fill="both", expand=True)
+
+        self.query_table = ttk.Frame(self.notebook, width=480, height=1000)
+        self.query_table.pack(fill="y")
+        db_con: DB = self.master.master.master.inner_state.db_connection
+        statistic = db_con.get_statistics()
+
+        # Generate table for Relation Statistics
+        header = ["relname", "relpages", "reltuples", "relhasindex"]
+        content = []
+        for val in statistic.values():
+            content.append([val[header_keys] for header_keys in header])
+
+        self.table = ttk.Treeview(self.query_table, columns=header, show="headings")
+        self.table.pack(fill="both", expand=True)
+        self.table.heading("#0", text="")
+        self.table.heading("#1", text="Name")
+        self.table.column("#1", width=40, anchor=tk.W)
+        self.table.heading("#2", text="No. of Pages")
+        self.table.column("#2", width=40, anchor=tk.W)
+        self.table.heading("#3", text="No. of Tuples")
+        self.table.column("#3", width=40, anchor=tk.W)
+        self.table.heading("#4", text="Has Index")
+        self.table.column("#4", width=25, anchor=tk.W)
+
+        for row in content:
+            self.table.insert("", "end", values=row)
+
+        # Generate table for Schemas
+        relations = db_con.get_table_names()
+        
+        self.schema_table_frame = ttk.Frame(self.notebook, width=480, height=1000)
+        self.schema_table_frame.pack(fill="y")
+
+        self.schema_table = ttk.Treeview(self.schema_table_frame, columns=["Relation", "Column"], show="tree headings")
+        self.schema_table.pack(fill="both", expand=True)
+
+        self.schema_table.column("#0", width=1, anchor=tk.W)
+        self.schema_table.heading("#1", text="Relation")
+        self.schema_table.column("#1", width=15, anchor=tk.W)
+        self.schema_table.heading("#2", text="Column")
+        self.schema_table.column("#2", width=40, anchor=tk.W)
+
+        for relation in relations:
+            columns = db_con.get_column_names(relation)
+            par = self.schema_table.insert("", "end", values=[relation, ""])
+            for column in columns:
+                self.schema_table.insert(par, "end", values=["", column])
+
+
+        self.notebook.add(self.query_table, text="Statistics")
+        self.notebook.add(self.schema_table_frame, text="Schemas")
+
+        
 
 class SQLInput(ttk.Frame):
     def __execute_query(self, event):
@@ -124,13 +195,11 @@ class SQLInput(ttk.Frame):
                 return
             
         query = self.query_input.get("1.0", "end-1c")
-        print(query)
         
         if db.is_query_valid(query)[0] is False:
             messagebox.showerror("Error", "Invalid query")
             reset_connection()
             return 
-        
         
         try:
             query_plan = self.master.master.master.master.inner_state.db_connection.get_query_plan(query) # forgive me
@@ -140,13 +209,17 @@ class SQLInput(ttk.Frame):
             return
         
         try:
-            graph = Graph(query_plan)
+            graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection)
             self.master.master.master.master.inner_state.graph = graph
+
             graphviz = GraphVisualizer(graph)
 
             self.master.master.master.refresh_query_content()
-        except:
-            messagebox.showerror("Error", "An error has during the creation of the graph")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            reset_connection()
+            
+        self.master.master.master.query_explanation.update_treeview(None)
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -158,13 +231,109 @@ class SQLInput(ttk.Frame):
         self.execute_button.pack(side = ttk.BOTTOM, pady=4, padx = 8, anchor=ttk.S)
         self.execute_button.bind("<Button-1>", self.__execute_query)
 
+### LAYOUT ###
+class LayoutHeader(ttk.Labelframe):
 
+    def connect_button_click(self, event):
+        username = self.user_entry.entry.get()
+        password = self.password_entry.entry.get()
+
+        address = self.address_entry.entry.get()
+        port = self.port_entry.entry.get()
+
+        self.master.login(address, port, username, password)
+
+    def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+        self.pack()
+
+        self.inner_frame = ttk.Frame(self)
+        self.inner_frame.pack(pady = 8, padx = 8, fill="both")
+
+        self.address_entry = InputWithLabel(self.inner_frame, placeholder="Address", label_text="Database Address", default_value="0.tcp.ap.ngrok.io")
+        self.address_entry.pack(side = ttk.LEFT, padx = 8)
+
+        self.port_entry = InputWithLabel(self.inner_frame, placeholder="Port", label_text = "Database Port", default_value="16206")
+        self.port_entry.pack(side = ttk.LEFT, padx = 8)
+
+        self.user_entry = InputWithLabel(self.inner_frame, placeholder="User", default_value="postgres", label_text="Database User")
+        self.user_entry.pack(side = ttk.LEFT, padx = 8)
+
+        self.password_entry = InputWithLabel(self.inner_frame, show="*", placeholder="Password", label_text="Database Password", default_value="sc3020ggez")
+        self.password_entry.pack(side = ttk.LEFT, padx = 8)
+
+        self.connect_button = ttk.Button(self.inner_frame, text="Connect")
+        self.connect_button.pack(side = ttk.LEFT, padx = 8, anchor=ttk.S)
+        self.connect_button.bind("<Button-1>", self.connect_button_click)
+
+class LayoutContentNotLoggedIn(ttk.LabelFrame):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pack()
+        self.label = ttk.Label(self, text="Please connect to the database first", anchor=ttk.CENTER)
+        self.label.pack(side = ttk.TOP, fill="both", expand=True)
+
+class LayoutContent(ttk.Frame):
+    def refresh_query_content(self):
+        # To be used after a new query
+        self.graph_image = ttk.PhotoImage(file="./qep.png")
+        self.graph_image_label.configure(image=self.graph_image)
+        self.graph_image_label.image = self.graph_image
+
+        # Refresh treeview explanation
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pack()
+        """
+        self
+        |-> first_row
+            |-> query_input_frame
+                |-> query_input
+            |-> query_result_frame
+                |-> graph_image_label
+        |-> second_row
+            |-> query_table
+            |-> query_explanation_frame
+                |-> explanation_label
+        
+        """
+
+        self.first_row = ttk.Frame(self, height=100)
+        self.first_row.pack(side = ttk.TOP, fill="both", expand=True)
+
+        self.query_input_frame = ttk.LabelFrame(self.first_row, borderwidth=2, text="SQL Input")
+        self.query_input_frame.pack(side = ttk.LEFT, fill="both", pady=4, padx = (0,8), expand=True)
+        self.sql_input = SQLInput(self.query_input_frame).pack(pady=4, padx = 8, fill="x")
+
+
+        self.query_result_frame = ttk.LabelFrame(self.first_row, borderwidth=2, text="Physical Query Plan")
+        self.query_result_frame.pack(side = ttk.LEFT, fill="both", pady=4, expand=True)
+
+        self.graph_image = None
+        self.graph_image_label = ttk.Label(self.query_result_frame, image=self.graph_image)
+        self.graph_image_label.pack(side = ttk.TOP, pady=4, padx = 8, expand=True)
+
+        self.second_row = ttk.Frame(self, height=100)
+        self.second_row.pack(side = ttk.TOP, fill="both", expand=True)
+
+
+        self.query_table = QueryTable(self.second_row)
+        self.query_table.pack(pady=4, padx = 8, fill="x", side = ttk.LEFT, expand=True)
+
+        self.query_explanation_frame = ttk.LabelFrame(self.second_row, borderwidth=2, text="Query Explanation")
+        self.query_explanation_frame.pack(side = ttk.LEFT, fill="both", pady=4, expand=True)
+
+        self.query_explanation = QueryExplanation(self.query_explanation_frame)
+        self.query_explanation.pack(pady=4, padx = 8, fill="x")
+
+### APPLICATION LOGIC ###
 class InnerState:
     # Define the global variables here
     def __init__(self):
         self.db_connection = None
         self.graph = None
-
 
 class App(ttk.Window):  
     def __init__(self, inner_state: InnerState): 
@@ -210,101 +379,4 @@ class App(ttk.Window):
         # Content that contains the query input and the query result
         self.content = LayoutContentNotLoggedIn(self, borderwidth=2)
         self.content.pack(side = ttk.TOP, padx=8, pady = 4, fill="both", expand=True)
-        
-
-class LayoutHeader(ttk.Labelframe):
-
-    def connect_button_click(self, event):
-        username = self.user_entry.entry.get()
-        password = self.password_entry.entry.get()
-
-        address = self.address_entry.entry.get()
-        port = self.port_entry.entry.get()
-
-        self.master.login(address, port, username, password)
-
-    def __init__(self, *args, **kwargs):
-
-        super().__init__(*args, **kwargs)
-        self.pack()
-
-        self.inner_frame = ttk.Frame(self)
-        self.inner_frame.pack(pady = 8, padx = 8, fill="both")
-
-        self.address_entry = InputWithLabel(self.inner_frame, placeholder="Address", label_text="Database Address", default_value="0.tcp.ap.ngrok.io")
-        self.address_entry.pack(side = ttk.LEFT, padx = 8)
-
-        self.port_entry = InputWithLabel(self.inner_frame, placeholder="Port", label_text = "Database Port", default_value="18539")
-        self.port_entry.pack(side = ttk.LEFT, padx = 8)
-
-        self.user_entry = InputWithLabel(self.inner_frame, placeholder="User", default_value="postgres", label_text="Database User")
-        self.user_entry.pack(side = ttk.LEFT, padx = 8)
-
-        self.password_entry = InputWithLabel(self.inner_frame, show="*", placeholder="Password", label_text="Database Password", default_value="sc3020ggez")
-        self.password_entry.pack(side = ttk.LEFT, padx = 8)
-
-        self.connect_button = ttk.Button(self.inner_frame, text="Connect")
-        self.connect_button.pack(side = ttk.LEFT, padx = 8, anchor=ttk.S)
-        self.connect_button.bind("<Button-1>", self.connect_button_click)
-
-class LayoutContentNotLoggedIn(ttk.LabelFrame):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.pack()
-        self.label = ttk.Label(self, text="Please connect to the database first", anchor=ttk.CENTER)
-        self.label.pack(side = ttk.TOP, fill="both", expand=True)
-
-class LayoutContent(ttk.Frame):
-    def refresh_query_content(self):
-        # To be used after a new query
-        self.graph_image = ttk.PhotoImage(file="./qep.png")
-        self.graph_image_label.configure(image=self.graph_image)
-        self.graph_image_label.image = self.graph_image
-
-        # Refresh treeview explanation
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.pack()
-        """
-        self
-        |-> first_row
-            |-> query_input_frame
-                |-> query_input
-            |-> query_result_frame
-                |-> graph_image_label
-        |-> second_row
-            |-> query_table_frame
-                |-> query_table
-            |-> query_explanation_frame
-                |-> explanation_label
-        
-        """
-
-        self.first_row = ttk.Frame(self, height=100)
-        self.first_row.pack(side = ttk.TOP, fill="both", expand=True)
-
-        self.query_input_frame = ttk.LabelFrame(self.first_row, borderwidth=2, text="SQL Input")
-        self.query_input_frame.pack(side = ttk.LEFT, fill="both", pady=4, padx = (0,8), expand=True)
-        self.sql_input = SQLInput(self.query_input_frame).pack(pady=4, padx = 8, fill="x")
-
-
-        self.query_result_frame = ttk.LabelFrame(self.first_row, borderwidth=2, text="Physical Query Plan")
-        self.query_result_frame.pack(side = ttk.LEFT, fill="both", pady=4, expand=True)
-
-        self.graph_image = None
-        self.graph_image_label = ttk.Label(self.query_result_frame, image=self.graph_image)
-        self.graph_image_label.pack(side = ttk.TOP, pady=4, padx = 8, expand=True)
-
-        self.second_row = ttk.Frame(self, height=100)
-        self.second_row.pack(side = ttk.TOP, fill="both", expand=True)
-
-        self.query_table_frame = ttk.LabelFrame(self.second_row, borderwidth=2, text="Query Table")
-        self.query_table_frame.pack(side = ttk.LEFT, fill="both", pady=4, padx = (0,8), expand=True)
-
-        self.query_explanation_frame = ttk.LabelFrame(self.second_row, borderwidth=2, text="Query Explanation")
-        self.query_explanation_frame.pack(side = ttk.LEFT, fill="both", pady=4, expand=True)
-
-        self.query_explanation = QueryExplanation(self.query_explanation_frame)
-        self.query_explanation.pack(pady=4, padx = 8, fill="x")
-
+      
