@@ -154,6 +154,8 @@ class Node:
             if self.filter: 
                 return self.get_cost_description_sequential_scan_with_filter() 
             return self.get_cost_description_sequential_scan() 
+        elif self.node_type == 'Sort':
+            desc = self.get_sort_cost_description()
         
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
