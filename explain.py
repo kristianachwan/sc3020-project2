@@ -221,14 +221,13 @@ class Node:
         # cpu_operator_cost -> db.get_cpu_operator_cost() or default value is 0.0025
         # number_of_input_tuples -> fetch 'rows' attribute of sequential scan
     # run cost = cpu_operator_cost *  number_of_input_tuples
-
     def get_sort_cost_description(self):
         cpu_operator_cost = self.db.get_cpu_operator_cost() # if this doesn't work then the default value is 0.0025
         comparison_cost = 2 * cpu_operator_cost
-        num_input_tuples = 240 # this is some random constant value. Need to write a function to fetch number of tuples returned from the scan operator cost. 
+        num_input_tuples = self.children[0].row_count # fetch number of tuples returned from the scan operator cost. 
         log_sort_tuples = math.log2(num_input_tuples)
 
-        last_scan_cost = 13.485 # this is some random constant value. Need to write a function to fetch cost of the scan operator. 
+        last_scan_cost = self.children[0].total_cost # fetch cost of the scan operator. 
         
         startup_cost = last_scan_cost + comparison_cost * num_input_tuples * log_sort_tuples
         run_cost = cpu_operator_cost * num_input_tuples
