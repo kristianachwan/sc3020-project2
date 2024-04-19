@@ -2,6 +2,7 @@ import psycopg2
 import graphviz
 import random
 from pprint import pp
+import math
 
 # this is permissible error from the estimation
 epsilon = 0.1
@@ -135,7 +136,7 @@ class DB:
         return statistics 
 
 class Node: 
-    def __init__(self, query_plan, db: DB): 
+    def __init__(self, query_plan, db: DB, children = []): 
         self.db = db 
         self.uuid = str(random.random())
         self.node_type = query_plan['Node Type']
@@ -153,6 +154,8 @@ class Node:
             if self.filter: 
                 return self.get_cost_description_sequential_scan_with_filter() 
             return self.get_cost_description_sequential_scan() 
+        elif self.node_type == 'Sort':
+            desc = self.get_sort_cost_description()
         
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
@@ -213,17 +216,88 @@ class Node:
             {"" if valid else reason}
         """
         return description
+    
+    # Sort cost = start_up cost + run cost
+    # start_up cost = cost_of_last_scan + 2 * cpu_operator_cost * number_of_input_tuples * log2(number_of_input_tuples)
+        # cost_of_last_scan -> can write function to fetch it. For now just assume some constant value
+        # cpu_operator_cost -> db.get_cpu_operator_cost() or default value is 0.0025
+        # number_of_input_tuples -> fetch 'rows' attribute of sequential scan
+    # run cost = cpu_operator_cost *  number_of_input_tuples
+    def get_sort_cost_description(self):
+        cpu_operator_cost = self.db.get_cpu_operator_cost() # if this doesn't work then the default value is 0.0025
+        comparison_cost = 2 * cpu_operator_cost
+        num_input_tuples = self.children[0].row_count # fetch number of tuples returned from the scan operator cost. 
+        log_sort_tuples = math.log2(num_input_tuples)
+
+        last_scan_cost = self.children[0].total_cost # fetch cost of the scan operator. 
+        
+        startup_cost = last_scan_cost + comparison_cost * num_input_tuples * log_sort_tuples
+        run_cost = cpu_operator_cost * num_input_tuples
+        total_cost = startup_cost + run_cost
+        
+        # Confirmation values from EXPLAIN command
+        psql_total_cost = self.total_cost  
+        valid = abs(total_cost - psql_total_cost) <= epsilon
+        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+
+        description = f"""
+            startup_cost = {startup_cost}
+            run_cost = {cpu_operator_cost} * {num_input_tuples} = {run_cost}
+            total_cost = startup_cost + run_cost = {total_cost}
+            PostgreSQL total_cost = {psql_total_cost}
+            Valid calculation? {"Yes" if valid else "No"}
+            {"" if valid else reason}
+        """
+        return description
+    
+    # Sort merge join cost = start_up cost + run cost
+    # startup_cost = num_input_tuples_rel_out*log2(num_input_tuples_rel_in) + num_input_tuples_rel_in * log2(num_input_tuples_rel_out)
+    # run cost = num_input_tuples_rel_in + num_input_tuples_rel_out
+    def get_sort_merge_join_description(self):
+        # compare sizes of 2 input relations. Smaller relation is rel_out and larger relation is rel_in
+        if self.children[0].row_count < self.children[1].row_count:
+            rel_inner = self.children[1]
+            rel_outer = self.children[0]
+        else:
+            rel_inner = self.children[0]
+            rel_outer = self.children[1]
+
+        # need to define a function to fetch number of tuples from the can of rel_out and rel_in
+        num_input_tuples_rel_out = rel_outer.row_count
+        num_input_tuples_rel_in = rel_inner.row_count
+
+        startup_cost = num_input_tuples_rel_out*math.log2(num_input_tuples_rel_in) + num_input_tuples_rel_in*math.log2(num_input_tuples_rel_out)
+
+        run_cost = num_input_tuples_rel_in + num_input_tuples_rel_out
+        total_cost = startup_cost + run_cost
+        
+        # Confirmation values from EXPLAIN command
+        psql_total_cost = self.total_cost  
+        valid = abs(total_cost - psql_total_cost) <= epsilon
+        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+
+        description = f"""
+            startup_cost = {startup_cost}
+            run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
+            total_cost = startup_cost + run_cost = {total_cost}
+            PostgreSQL total_cost = {psql_total_cost}
+            Valid calculation? {"Yes" if valid else "No"}
+            {"" if valid else reason}
+        """
+        return description
+    
 class Graph:    
     def __init__(self, query_plan, db: DB): 
         self.db = db 
         self.root = self.parse_query_plan(query_plan)
     
     def parse_query_plan(self, query_plan):
-        node = Node(query_plan, self.db)
+        children = []
         if 'Plans' in query_plan: 
             for child_query_plan in query_plan['Plans']: 
-                node.children.append(self.parse_query_plan(child_query_plan)) 
+                children.append(self.parse_query_plan(child_query_plan)) 
 
+        node = Node(query_plan, self.db, children)
         return node 
     
 class GraphVisualizer: 
