@@ -168,8 +168,8 @@ class Node:
         self.filter = query_plan['Filter'] if 'Filter' in query_plan else ""
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = children
-        self.cost_description = self.get_cost_description() 
         self.epsilon = epsilon
+        self.cost_description = self.get_cost_description() 
         
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
