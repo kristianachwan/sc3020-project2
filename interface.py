@@ -208,8 +208,10 @@ class SQLInput(ttk.Frame):
             reset_connection()
             return
         
+        epsilon = float(self.epsilon_input.get())
+
         try:
-            graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection, 0.05)
+            graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection, epsilon=epsilon)
             self.master.master.master.master.inner_state.graph = graph
 
             graphviz = GraphVisualizer(graph)
@@ -227,10 +229,17 @@ class SQLInput(ttk.Frame):
             start_idx = "1.0"
             while True:
                 start_idx = self.query_input.search(keyword, start_idx, stopindex="end", nocase=1)
+                
                 if not start_idx:
                     break
                 end_idx = f"{start_idx}+{len(keyword)}c"
-                self.query_input.tag_add("keyword", start_idx, end_idx)
+                # Get the previous and next characters
+                prev_char = self.query_input.get(f"{start_idx}-1c")
+                next_char = self.query_input.get(end_idx)
+
+                # Check if they are whitespace characters
+                if (not prev_char or prev_char.isspace()) and (not next_char or next_char.isspace()):
+                    self.query_input.tag_add("keyword", start_idx, end_idx)
                 start_idx = end_idx
     
     def __init__(self, *args, **kwargs):
@@ -245,10 +254,12 @@ class SQLInput(ttk.Frame):
         self.execute_button.bind("<Button-1>", self.__execute_query)
 
         
-        self.episolon_input = Input(self, placeholder="Epsilon", default_value="0.05")
-        self.episolon_input.pack(side = ttk.RIGHT, pady=4, padx = 8)
-        self.episolon_label = ttk.Label(self, text="Epsilon", anchor=ttk.W)
-        self.episolon_label.pack(side = ttk.RIGHT, pady=4, padx = 8)
+        self.epsilon_input = Input(self, placeholder="Epsilon", default_value="0.05")
+        self.epsilon_input.pack(side = ttk.RIGHT, pady=4, padx = 8)
+        self.epsilon_label = ttk.Label(self, text="Epsilon", anchor=ttk.W)
+        self.epsilon_label.pack(side = ttk.RIGHT, pady=4, padx = 8)
+
+        # Change self.m
 
         self.query_input.bind("<KeyRelease>", self.highlight_keywords)
 
@@ -435,6 +446,8 @@ class App(ttk.Window):
         else:
             self.content = LayoutContentNotLoggedIn(self, borderwidth=2)
         self.content.pack(side = ttk.TOP, padx=8, pady = 4, fill="both", expand=True)
+        
+        self.footer = LayoutFooter(self, borderwidth=2)
         self.footer.pack(side = ttk.TOP, padx=8, pady = 4, fill="x")
 
 
