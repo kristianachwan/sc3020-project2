@@ -165,7 +165,7 @@ class QueryTable(ttk.Frame):
         self.schema_table.heading("#1", text="Relation")
         self.schema_table.column("#1", width=15, anchor=tk.W)
         self.schema_table.heading("#2", text="Column")
-        self.schema_table.column("#2", width=40, anchor=tk.W)
+        self.schema_table.column("#2", width=10, anchor=tk.W)
 
         for relation in relations:
             columns = db_con.get_column_names(relation)
@@ -295,14 +295,13 @@ class LayoutHeader(ttk.Labelframe):
                 self.port_entry.entry.config(state="disabled")
                 self.user_entry.entry.config(state="disabled")
                 self.password_entry.entry.config(state="disabled")
-            except:
-                
+            except:  
                 messagebox.showerror("Error", "Invalid username or password")
-            finally:
-                self.master.refresh_content_layout()
+                
 
         self.refresh_connection_status()
         self.refresh_connect_button()
+        self.master.refresh_content_layout()
         self.connect_button.config(state="normal")
 
     def refresh_connection_status(self):
@@ -325,19 +324,19 @@ class LayoutHeader(ttk.Labelframe):
         self.inner_frame = ttk.Frame(self)
         self.inner_frame.pack(pady = 8, padx = 8, fill="both")
 
-        self.address_entry = InputWithLabel(self.inner_frame, placeholder="Address", label_text="Database Address", default_value="0.tcp.ap.ngrok.io")
+        self.address_entry = InputWithLabel(self.inner_frame, placeholder="Address", label_text="Database Address")
         self.address_entry.pack(side = ttk.LEFT, padx = 8)
 
         self.database_entry = InputWithLabel(self.inner_frame, placeholder="Database", default_value="postgres", label_text="Database Name")
         self.database_entry.pack(side = ttk.LEFT, padx = 8)
 
-        self.port_entry = InputWithLabel(self.inner_frame, placeholder="Port", label_text = "Database Port", default_value="16206")
+        self.port_entry = InputWithLabel(self.inner_frame, placeholder="Port", label_text = "Database Port", default_value="5432")
         self.port_entry.pack(side = ttk.LEFT, padx = 8)
 
         self.user_entry = InputWithLabel(self.inner_frame, placeholder="User", default_value="postgres", label_text="Database User")
         self.user_entry.pack(side = ttk.LEFT, padx = 8)
 
-        self.password_entry = InputWithLabel(self.inner_frame, show="*", placeholder="Password", label_text="Database Password", default_value="sc3020ggez")
+        self.password_entry = InputWithLabel(self.inner_frame, show="*", placeholder="Password", label_text="Database Password")
         self.password_entry.pack(side = ttk.LEFT, padx = 8)
         
 
@@ -403,11 +402,11 @@ class LayoutContent(ttk.Frame):
         self.second_row.pack(side = ttk.TOP, fill="both", expand=True)
 
 
-        self.query_table = QueryTable(self.second_row)
+        self.query_table = QueryTable(self.second_row, width=480)
         self.query_table.pack(pady=4, padx = 8, fill="x", side = ttk.LEFT, expand=True)
 
         self.query_explanation_frame = ttk.LabelFrame(self.second_row, borderwidth=2, text="Query Explanation")
-        self.query_explanation_frame.pack(side = ttk.LEFT, fill="both", pady=4, expand=True)
+        self.query_explanation_frame.pack(side = ttk.LEFT, fill="x", pady=4)
 
         self.query_explanation = QueryExplanation(self.query_explanation_frame)
         self.query_explanation.pack(pady=4, padx = 8, fill="x")
