@@ -1,9 +1,8 @@
 import ttkbootstrap as ttk
 import tkinter as tk
-from ttkbootstrap.scrolled import ScrolledFrame
 from tkinter import messagebox
 from explain import DB, Graph, GraphVisualizer, Node
-import time
+from PIL import Image, ImageTk
 
 TEXT_PRIMARY_COLOR = "#F9F9F9"
 TEXT_SECONDARY_COLOR = "grey"
@@ -340,7 +339,6 @@ class LayoutHeader(ttk.Labelframe):
 
         self.password_entry = InputWithLabel(self.inner_frame, show="*", placeholder="Password", label_text="Database Password")
         self.password_entry.pack(side = ttk.LEFT, padx = 8)
-        
 
         self.connect_button = ttk.Button(self.inner_frame, text="Connect")
         self.connect_button.pack(side = ttk.LEFT, padx = 8, anchor=ttk.S)
@@ -362,7 +360,9 @@ class LayoutContentNotLoggedIn(ttk.LabelFrame):
 class LayoutContent(ttk.Frame):
     def refresh_query_content(self):
         # To be used after a new query
-        self.graph_image = ttk.PhotoImage(file="./qep.png")
+        image = Image.open('./qep.png')
+        image = image.resize((480, 480))
+        self.graph_image = ImageTk.PhotoImage(image)
         self.graph_image_label.configure(image=self.graph_image)
         self.graph_image_label.image = self.graph_image
 
