@@ -249,6 +249,7 @@ class SQLInput(ttk.Frame):
 ### LAYOUT ###
 class LayoutHeader(ttk.Labelframe):
 
+
     def connect_button_click(self, event):
         self.connect_button.config(state="disabled")
         if self.master.inner_state.db_connection:
@@ -268,23 +269,27 @@ class LayoutHeader(ttk.Labelframe):
             address = self.address_entry.entry.get()
             port = self.port_entry.entry.get()
 
-            # Disable input fields
-            self.address_entry.entry.config(state="disabled")
-            self.database_entry.entry.config(state="disabled")
-            self.port_entry.entry.config(state="disabled")
-            self.user_entry.entry.config(state="disabled")
-            self.password_entry.entry.config(state="disabled")
+            try:
+                self.master.login(address, database, port, username, password)
 
-            self.master.login(address, database, port, username, password)
-        
+                # Disable input fields
+                self.address_entry.entry.config(state="disabled")
+                self.database_entry.entry.config(state="disabled")
+                self.port_entry.entry.config(state="disabled")
+                self.user_entry.entry.config(state="disabled")
+                self.password_entry.entry.config(state="disabled")
+            except:
+                self.master.refresh_content_layout()
+                messagebox.showerror("Error", "Invalid username or password")
+
         self.refresh_connection_status()
         self.refresh_connect_button()
-        self.master
         self.connect_button.config(state="normal")
 
     def refresh_connection_status(self):
         if self.master.inner_state.db_connection:
             self.connected_label.config(text="Connected", style="success.TLabel")
+            self.connect_button_click.after
         else:
             self.connected_label.config(text="Not Connected", style="danger.TLabel")
 
@@ -325,6 +330,7 @@ class LayoutHeader(ttk.Labelframe):
 
         self.connected_label = ttk.Label(self.inner_frame)
         self.connected_label.pack(side = ttk.RIGHT, padx = 8, anchor=ttk.E)
+        
         self.refresh_connection_status()
 
 class LayoutContentNotLoggedIn(ttk.LabelFrame):
@@ -417,19 +423,15 @@ class App(ttk.Window):
 
     def login(self, address, database, port, username, password):
         self.inner_state.db_connection = None
-        try:
-            db_connection = DB({
-                "host": address, 
-                "port": port, 
-                "database": database,
-                "user": username, 
-                "password": password
-            })
-            self.inner_state.db_connection = db_connection
-            self.refresh_content_layout()
-        except:
-            self.refresh_content_layout()
-            messagebox.showerror("Error", "Invalid username or password")
+        db_connection = DB({
+            "host": address, 
+            "port": port, 
+            "database": database,
+            "user": username, 
+            "password": password
+        })
+        self.inner_state.db_connection = db_connection
+            
         
     def disconnect(self):
         if self.inner_state.db_connection:
