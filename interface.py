@@ -235,13 +235,49 @@ class SQLInput(ttk.Frame):
 class LayoutHeader(ttk.Labelframe):
 
     def connect_button_click(self, event):
-        username = self.user_entry.entry.get()
-        password = self.password_entry.entry.get()
+        self.connect_button.config(state="disabled")
+        if self.master.inner_state.db_connection:
+            # Enable input fields
+            self.address_entry.entry.config(state="normal")
+            self.database_entry.entry.config(state="normal")
+            self.port_entry.entry.config(state="normal")
+            self.user_entry.entry.config(state="normal")
+            self.password_entry.entry.config(state="normal")
 
-        address = self.address_entry.entry.get()
-        port = self.port_entry.entry.get()
+            self.master.disconnect()
+        else:
+            username = self.user_entry.entry.get()
+            password = self.password_entry.entry.get()
+            database = self.database_entry.entry.get()
 
-        self.master.login(address, port, username, password)
+            address = self.address_entry.entry.get()
+            port = self.port_entry.entry.get()
+
+            # Disable input fields
+            self.address_entry.entry.config(state="disabled")
+            self.database_entry.entry.config(state="disabled")
+            self.port_entry.entry.config(state="disabled")
+            self.user_entry.entry.config(state="disabled")
+            self.password_entry.entry.config(state="disabled")
+
+            self.master.login(address, database, port, username, password)
+        
+        self.refresh_connection_status()
+        self.refresh_connect_button()
+        self.master
+        self.connect_button.config(state="normal")
+
+    def refresh_connection_status(self):
+        if self.master.inner_state.db_connection:
+            self.connected_label.config(text="Connected", style="success.TLabel")
+        else:
+            self.connected_label.config(text="Not Connected", style="danger.TLabel")
+
+    def refresh_connect_button(self):
+        if self.master.inner_state.db_connection:
+            self.connect_button.config(text="Disconnect", style="danger.TButton")
+        else:
+            self.connect_button.config(text="Connect", style="primary.TButton")
 
     def __init__(self, *args, **kwargs):
 
@@ -254,6 +290,9 @@ class LayoutHeader(ttk.Labelframe):
         self.address_entry = InputWithLabel(self.inner_frame, placeholder="Address", label_text="Database Address", default_value="0.tcp.ap.ngrok.io")
         self.address_entry.pack(side = ttk.LEFT, padx = 8)
 
+        self.database_entry = InputWithLabel(self.inner_frame, placeholder="Database", default_value="postgres", label_text="Database Name")
+        self.database_entry.pack(side = ttk.LEFT, padx = 8)
+
         self.port_entry = InputWithLabel(self.inner_frame, placeholder="Port", label_text = "Database Port", default_value="16206")
         self.port_entry.pack(side = ttk.LEFT, padx = 8)
 
@@ -262,10 +301,16 @@ class LayoutHeader(ttk.Labelframe):
 
         self.password_entry = InputWithLabel(self.inner_frame, show="*", placeholder="Password", label_text="Database Password", default_value="sc3020ggez")
         self.password_entry.pack(side = ttk.LEFT, padx = 8)
+        
 
         self.connect_button = ttk.Button(self.inner_frame, text="Connect")
         self.connect_button.pack(side = ttk.LEFT, padx = 8, anchor=ttk.S)
         self.connect_button.bind("<Button-1>", self.connect_button_click)
+
+
+        self.connected_label = ttk.Label(self.inner_frame)
+        self.connected_label.pack(side = ttk.RIGHT, padx = 8, anchor=ttk.E)
+        self.refresh_connection_status()
 
 class LayoutContentNotLoggedIn(ttk.LabelFrame):
     def __init__(self, *args, **kwargs):
@@ -338,7 +383,7 @@ class InnerState:
 class App(ttk.Window):  
     def __init__(self, inner_state: InnerState): 
         super().__init__(self, themename="darkly")
-        
+
         self.title("SC3020 Project 2")
         self.geometry("1280x900")
         self.minsize(1024, 800)
@@ -348,20 +393,20 @@ class App(ttk.Window):
     def refresh_content_layout(self):
         # Used to re-render the entirety of the content layout to its default state
         self.content.pack_forget()
-        if self.inner_state.db_connection is not None:
+        if self.inner_state.db_connection:
             self.content = LayoutContent(self, borderwidth=2)
         else:
-            self.content = LayoutContentNotLoggedIn(self, borderwidth=2, text="Content")
+            self.content = LayoutContentNotLoggedIn(self, borderwidth=2)
         self.content.pack(side = ttk.TOP, padx=8, pady = 4, fill="both", expand=True)
 
 
-    def login(self, address, port, username, password):
-        self.db_connection = None
+    def login(self, address, database, port, username, password):
+        self.inner_state.db_connection = None
         try:
             db_connection = DB({
                 "host": address, 
                 "port": port, 
-                "database": "postgres", # hard coded 
+                "database": database,
                 "user": username, 
                 "password": password
             })
@@ -371,6 +416,12 @@ class App(ttk.Window):
             self.refresh_content_layout()
             messagebox.showerror("Error", "Invalid username or password")
         
+    def disconnect(self):
+        if self.inner_state.db_connection:
+            self.inner_state.db_connection.close_connection()
+            self.inner_state.db_connection = None
+            self.refresh_content_layout()
+
     def generate_layout(self):
         # Header that contains the input to the database connection
         self.header = LayoutHeader(self, borderwidth=2, text="Database Connection")
