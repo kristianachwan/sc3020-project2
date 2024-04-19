@@ -176,6 +176,8 @@ class Node:
         self.valid = False
         self.cost_description = self.get_cost_description() 
         
+    def get_label(self): 
+        return f"""{self.node_type} {" - " + self.relation_name if self.relation_name else ""}\n{"cost: " + str(round(self.total_cost, 3))}"""
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
             if self.filter: 
@@ -419,11 +421,12 @@ class GraphVisualizer:
         self.parse_graph(graph.root)
         self.graphviz.render('qep')
 
-    def parse_graph(self, node):
+    def parse_graph(self, node: Node):
         if not node.valid: 
-            self.graphviz.node(node.uuid, node.node_type, fillcolor='cyan', style='filled')
+            self.graphviz.node(node.uuid, node.get_label(), fillcolor='cyan', style='filled')
         else: 
-            self.graphviz.node(node.uuid, node.node_type, fillcolor='green', style='filled')
+            self.graphviz.node(node.uuid, node.get_label(), fillcolor='green', style='filled')
+            
         if node.children: 
             for child in node.children: 
                 self.graphviz.node(child.uuid, child.node_type)
