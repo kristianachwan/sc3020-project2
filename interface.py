@@ -3,7 +3,7 @@ import tkinter as tk
 from ttkbootstrap.scrolled import ScrolledFrame
 from tkinter import messagebox
 from explain import DB, Graph, GraphVisualizer, Node
-import time
+from PIL import ImageTk, Image
 
 TEXT_PRIMARY_COLOR = "#F9F9F9"
 TEXT_SECONDARY_COLOR = "grey"
@@ -299,7 +299,6 @@ class LayoutHeader(ttk.Labelframe):
                 self.password_entry.entry.config(state="disabled")
             except:  
                 messagebox.showerror("Error", "Invalid username or password")
-                
 
         self.refresh_connection_status()
         self.refresh_connect_button()
@@ -436,6 +435,10 @@ class App(ttk.Window):
 
         self.title("QUPEX - Query Plan Explorer")
         self.iconbitmap("icon.ico")
+        self.icon_photo = ImageTk.PhotoImage(
+            Image.open('icon.ico')
+        )
+        self.iconphoto(True, self.icon_photo)
         self.geometry("1280x900")
         self.minsize(1024, 800)
         self.inner_state = inner_state
