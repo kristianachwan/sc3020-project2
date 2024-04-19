@@ -106,7 +106,7 @@ class QueryExplanation(ttk.Frame):
         self.query_explanation_frame = ttk.Frame(self)
         self.query_explanation_frame.pack(side = ttk.LEFT, fill="both", expand=True)
 
-        explanation = "Lorem ipsum dolor sit amet, consectetur adipiscing elit"
+        explanation = "Click on the table to the left to see the explanation of the query plan."
 
         self.query_explanation = ttk.Label(self.query_explanation_frame, text=explanation, anchor=ttk.NW, width=100)
         self.query_explanation.pack(side = ttk.LEFT)
@@ -234,7 +234,7 @@ class SQLInput(ttk.Frame):
                     break
                 end_idx = f"{start_idx}+{len(keyword)}c"
                 # Get the previous and next characters
-                prev_char = self.query_input.get(f"{start_idx}-1c")
+                prev_char = self.query_input.get(f"{start_idx}-1c") if start_idx != "1.0" else ""
                 next_char = self.query_input.get(end_idx)
 
                 # Check if they are whitespace characters
