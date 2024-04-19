@@ -218,7 +218,7 @@ class Node:
         return description
     
     # Sort cost = start_up cost + run cost
-    # start_up cost = cost_of_last_scan + 2*cpu_operator_cost * number_of_input_tuples * log2(number_of_input_tuples )
+    # start_up cost = cost_of_last_scan + 2 * cpu_operator_cost * number_of_input_tuples * log2(number_of_input_tuples)
         # cost_of_last_scan -> can write function to fetch it. For now just assume some constant value
         # cpu_operator_cost -> db.get_cpu_operator_cost() or default value is 0.0025
         # number_of_input_tuples -> fetch 'rows' attribute of sequential scan
@@ -251,7 +251,7 @@ class Node:
         return description
     
     # Sort merge join cost = start_up cost + run cost
-    # startup_cost = num_input_tuples_rel_out*log2(num_input_tuples_rel_in) +            num_input_tuples_rel_in*log2(num_input_tuples_rel_out)
+    # startup_cost = num_input_tuples_rel_out*log2(num_input_tuples_rel_in) + num_input_tuples_rel_in * log2(num_input_tuples_rel_out)
     # run cost = num_input_tuples_rel_in + num_input_tuples_rel_out
     def get_sort_merge_join_description(self):
         # compare sizes of 2 input relations. Smaller relation is rel_out and larger relation is rel_in
