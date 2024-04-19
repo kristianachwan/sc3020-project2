@@ -429,11 +429,13 @@ class App(ttk.Window):
     def refresh_content_layout(self):
         # Used to re-render the entirety of the content layout to its default state
         self.content.pack_forget()
+        self.footer.pack_forget()
         if self.inner_state.db_connection:
             self.content = LayoutContent(self, borderwidth=2)
         else:
             self.content = LayoutContentNotLoggedIn(self, borderwidth=2)
         self.content.pack(side = ttk.TOP, padx=8, pady = 4, fill="both", expand=True)
+        self.footer.pack(side = ttk.TOP, padx=8, pady = 4, fill="x")
 
 
     def login(self, address, database, port, username, password):
