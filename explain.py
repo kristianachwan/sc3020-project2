@@ -40,10 +40,12 @@ class DB:
                     RAISE NOTICE 'ANALYZE has already been run on some tables.';
                 END IF;
             END $$;
-        """) 
+        """)
+    def close_connection(self):
+        self.cursor.close()
+        self.connection.close() 
 
     def reset_connection(self):
-        self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
         self.cursor = self.connection.cursor()
         
     def get_query_plan(self, query: str): 
