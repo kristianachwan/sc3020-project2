@@ -59,7 +59,6 @@ class InputWithLabel(ttk.Frame):
 
         self.entry = Input(self, placeholder=placeholder, default_value=default_value, show=show, )
         self.entry.pack(side = ttk.TOP)         
-        
 
 ### CONTENT SUBLAYOUTS ###
 class QueryExplanation(ttk.Frame):
@@ -181,6 +180,7 @@ class QueryTable(ttk.Frame):
         
 
 class SQLInput(ttk.Frame):
+    SQL_KEYWORDS = ["SELECT", "FROM", "WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "NATURAL JOIN", "USING", "ON", "AS", "AND", "OR", "NOT", "IN", "LIKE", "BETWEEN", "IS", "NULL", "EXISTS", "ALL", "ANY", "SOME", "UNION", "INTERSECT", "EXCEPT", "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE", "CREATE", "TABLE", "DROP", "ALTER", "ADD", "PRIMARY KEY", "FOREIGN KEY", "REFERENCES", "INDEX", "UNIQUE", "CHECK", "DEFAULT", "AUTO_INCREMENT", "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME", "CURRENT_USER", "DATABASE", "IF", "EXISTS", "THEN", "ELSE", "END", "CASE", "WHEN", "WHILE", "DO", "BEGIN", "DECLARE", "CURSOR", "OPEN", "CLOSE", "FETCH", "LOOP", "EXIT", "CONTINUE", "GOTO", "RETURN", "CALL", "PROCEDURE", "FUNCTION", "TRIGGER", "EVENT", "HANDLER", "REPLACE", "GRANT", "REVOKE", "PRIVILEGES", "WITH", "OPTION", "LOCK", "UNLOCK", "START", "TRANSACTION", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE", "ISOLATION", "LEVEL", "READ", "WRITE", "ONLY", "REPEATABLE", "COMMITTED", "SERIALIZABLE", "AUTOCOMMIT", "SHOW", "STATUS", "VARIABLES", "DATABASES", "TABLES", "INDEXES", "GRANTS", "PROCESSLIST", "KILL", "SHUTDOWN", "LOGS", "ERRORS", "WARNINGS", "SLAVE", "MASTER", "REPLICATION", "BINARY", "LOG", "POSITION", "FILE", "FORMAT", "PASSWORD", "USER", "HOST", "PRIVILEGE", "RELOAD", "FLUSH", "LOGS", "TABLES", "STATISTICS", "QUERY", "CACHE", "MEMORY"] 
     def __execute_query(self, event):
         db: DB = self.master.master.master.master.inner_state.db_connection
         def reset_connection():
@@ -221,15 +221,30 @@ class SQLInput(ttk.Frame):
             
         self.master.master.master.query_explanation.update_treeview(None)
     
+    def highlight_keywords(self, event):
+        text = self.query_input.get("1.0", "end")
+        for keyword in SQLInput.SQL_KEYWORDS:
+            start_idx = "1.0"
+            while True:
+                start_idx = self.query_input.search(keyword, start_idx, stopindex="end", nocase=1)
+                if not start_idx:
+                    break
+                end_idx = f"{start_idx}+{len(keyword)}c"
+                self.query_input.tag_add("keyword", start_idx, end_idx)
+                start_idx = end_idx
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
         self.query_input = ttk.Text(self, width=50, font=("Consolas", 12), wrap="word")
         self.query_input.pack(side = ttk.TOP, pady=4, padx = 8, fill="x", expand=True)
+        self.query_input.tag_configure("keyword", foreground="#9090f5")
 
         self.execute_button = ttk.Button(self, text="Execute")
         self.execute_button.pack(side = ttk.BOTTOM, pady=4, padx = 8, anchor=ttk.S)
         self.execute_button.bind("<Button-1>", self.__execute_query)
+
+        self.query_input.bind("<KeyRelease>", self.highlight_keywords)
 
 ### LAYOUT ###
 class LayoutHeader(ttk.Labelframe):
