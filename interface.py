@@ -108,7 +108,7 @@ class QueryExplanation(ttk.Frame):
 
         explanation = "Click on the table to the left to see the explanation of the query plan."
 
-        self.query_explanation = ttk.Label(self.query_explanation_frame, text=explanation, anchor=ttk.NW, width=100)
+        self.query_explanation = ttk.Label(self.query_explanation_frame, text=explanation, anchor=ttk.NW)
         self.query_explanation.pack(side = ttk.LEFT)
 
 class QueryTable(ttk.Frame):
@@ -224,7 +224,9 @@ class SQLInput(ttk.Frame):
         self.master.master.master.query_explanation.update_treeview(None)
     
     def highlight_keywords(self, event):
-        text = self.query_input.get("1.0", "end")
+        # Remove all tags
+        self.query_input.tag_remove("keyword", "1.0", "end")
+
         for keyword in SQLInput.SQL_KEYWORDS:
             start_idx = "1.0"
             while True:
@@ -245,7 +247,7 @@ class SQLInput(ttk.Frame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
-        self.query_input = ttk.Text(self, width=50, font=("Courier", 12), wrap="word")
+        self.query_input = ttk.Text(self, width=50, font=("Monaco", 12), wrap="word")
         self.query_input.pack(side = ttk.TOP, pady=4, padx = 8, fill="x", expand=True)
         self.query_input.tag_configure("keyword", foreground="#9090f5")
 
@@ -404,10 +406,10 @@ class LayoutContent(ttk.Frame):
         self.query_table_frame = ttk.Frame(self.second_row, borderwidth=2)
         self.query_table_frame.pack(side = ttk.LEFT, fill="both", expand=True)
 
-        self.query_table = QueryTable(self.query_table_frame, width=720)
-        self.query_table.pack(pady=4, padx = 8, fill="x", side = ttk.LEFT, expand=True)
+        self.query_table = QueryTable(self.query_table_frame, width=480)
+        self.query_table.pack(pady=4, padx = 8, side = ttk.LEFT, fill="both", expand=True)
 
-        self.query_explanation_frame = ttk.LabelFrame(self.second_row, borderwidth=2, text="Query Explanation")
+        self.query_explanation_frame = ttk.LabelFrame(self.second_row, borderwidth=2, text="Query Explanation", width=720)
         self.query_explanation_frame.pack(side = ttk.LEFT, pady=4)
 
         self.query_explanation = QueryExplanation(self.query_explanation_frame)
