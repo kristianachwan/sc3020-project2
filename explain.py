@@ -161,7 +161,6 @@ class Node:
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = children
         self.cost_description = self.get_cost_description() 
-        print(self.cost_description)
         
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
