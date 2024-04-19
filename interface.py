@@ -59,7 +59,6 @@ class InputWithLabel(ttk.Frame):
 
         self.entry = Input(self, placeholder=placeholder, default_value=default_value, show=show, )
         self.entry.pack(side = ttk.TOP)         
-        
 
 ### CONTENT SUBLAYOUTS ###
 class QueryExplanation(ttk.Frame):
@@ -181,6 +180,7 @@ class QueryTable(ttk.Frame):
         
 
 class SQLInput(ttk.Frame):
+    SQL_KEYWORDS = ["SELECT", "FROM", "WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "NATURAL JOIN", "USING", "ON", "AS", "AND", "OR", "NOT", "IN", "LIKE", "BETWEEN", "IS", "NULL", "EXISTS", "ALL", "ANY", "SOME", "UNION", "INTERSECT", "EXCEPT", "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE", "CREATE", "TABLE", "DROP", "ALTER", "ADD", "PRIMARY KEY", "FOREIGN KEY", "REFERENCES", "INDEX", "UNIQUE", "CHECK", "DEFAULT", "AUTO_INCREMENT", "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME", "CURRENT_USER", "DATABASE", "IF", "EXISTS", "THEN", "ELSE", "END", "CASE", "WHEN", "WHILE", "DO", "BEGIN", "DECLARE", "CURSOR", "OPEN", "CLOSE", "FETCH", "LOOP", "EXIT", "CONTINUE", "GOTO", "RETURN", "CALL", "PROCEDURE", "FUNCTION", "TRIGGER", "EVENT", "HANDLER", "REPLACE", "GRANT", "REVOKE", "PRIVILEGES", "WITH", "OPTION", "LOCK", "UNLOCK", "START", "TRANSACTION", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE", "ISOLATION", "LEVEL", "READ", "WRITE", "ONLY", "REPEATABLE", "COMMITTED", "SERIALIZABLE", "AUTOCOMMIT", "SHOW", "STATUS", "VARIABLES", "DATABASES", "TABLES", "INDEXES", "GRANTS", "PROCESSLIST", "KILL", "SHUTDOWN", "LOGS", "ERRORS", "WARNINGS", "SLAVE", "MASTER", "REPLICATION", "BINARY", "LOG", "POSITION", "FILE", "FORMAT", "PASSWORD", "USER", "HOST", "PRIVILEGE", "RELOAD", "FLUSH", "LOGS", "TABLES", "STATISTICS", "QUERY", "CACHE", "MEMORY"] 
     def __execute_query(self, event):
         db: DB = self.master.master.master.master.inner_state.db_connection
         def reset_connection():
@@ -221,18 +221,34 @@ class SQLInput(ttk.Frame):
             
         self.master.master.master.query_explanation.update_treeview(None)
     
+    def highlight_keywords(self, event):
+        text = self.query_input.get("1.0", "end")
+        for keyword in SQLInput.SQL_KEYWORDS:
+            start_idx = "1.0"
+            while True:
+                start_idx = self.query_input.search(keyword, start_idx, stopindex="end", nocase=1)
+                if not start_idx:
+                    break
+                end_idx = f"{start_idx}+{len(keyword)}c"
+                self.query_input.tag_add("keyword", start_idx, end_idx)
+                start_idx = end_idx
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
         self.query_input = ttk.Text(self, width=50, font=("Consolas", 12), wrap="word")
         self.query_input.pack(side = ttk.TOP, pady=4, padx = 8, fill="x", expand=True)
+        self.query_input.tag_configure("keyword", foreground="#9090f5")
 
         self.execute_button = ttk.Button(self, text="Execute")
         self.execute_button.pack(side = ttk.BOTTOM, pady=4, padx = 8, anchor=ttk.S)
         self.execute_button.bind("<Button-1>", self.__execute_query)
 
+        self.query_input.bind("<KeyRelease>", self.highlight_keywords)
+
 ### LAYOUT ###
 class LayoutHeader(ttk.Labelframe):
+
 
     def connect_button_click(self, event):
         self.connect_button.config(state="disabled")
@@ -253,23 +269,27 @@ class LayoutHeader(ttk.Labelframe):
             address = self.address_entry.entry.get()
             port = self.port_entry.entry.get()
 
-            # Disable input fields
-            self.address_entry.entry.config(state="disabled")
-            self.database_entry.entry.config(state="disabled")
-            self.port_entry.entry.config(state="disabled")
-            self.user_entry.entry.config(state="disabled")
-            self.password_entry.entry.config(state="disabled")
+            try:
+                self.master.login(address, database, port, username, password)
 
-            self.master.login(address, database, port, username, password)
-        
+                # Disable input fields
+                self.address_entry.entry.config(state="disabled")
+                self.database_entry.entry.config(state="disabled")
+                self.port_entry.entry.config(state="disabled")
+                self.user_entry.entry.config(state="disabled")
+                self.password_entry.entry.config(state="disabled")
+            except:
+                self.master.refresh_content_layout()
+                messagebox.showerror("Error", "Invalid username or password")
+
         self.refresh_connection_status()
         self.refresh_connect_button()
-        self.master
         self.connect_button.config(state="normal")
 
     def refresh_connection_status(self):
         if self.master.inner_state.db_connection:
             self.connected_label.config(text="Connected", style="success.TLabel")
+            self.connect_button_click.after
         else:
             self.connected_label.config(text="Not Connected", style="danger.TLabel")
 
@@ -310,6 +330,7 @@ class LayoutHeader(ttk.Labelframe):
 
         self.connected_label = ttk.Label(self.inner_frame)
         self.connected_label.pack(side = ttk.RIGHT, padx = 8, anchor=ttk.E)
+        
         self.refresh_connection_status()
 
 class LayoutContentNotLoggedIn(ttk.LabelFrame):
@@ -373,6 +394,14 @@ class LayoutContent(ttk.Frame):
         self.query_explanation = QueryExplanation(self.query_explanation_frame)
         self.query_explanation.pack(pady=4, padx = 8, fill="x")
 
+class LayoutFooter(ttk.Frame):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pack()
+
+        self.label = ttk.Label(self, text="Made with <3 by Team 1", anchor=ttk.CENTER, foreground="grey")
+        self.label.pack(side = ttk.TOP, fill="both", expand=True)
+
 ### APPLICATION LOGIC ###
 class InnerState:
     # Define the global variables here
@@ -402,19 +431,15 @@ class App(ttk.Window):
 
     def login(self, address, database, port, username, password):
         self.inner_state.db_connection = None
-        try:
-            db_connection = DB({
-                "host": address, 
-                "port": port, 
-                "database": database,
-                "user": username, 
-                "password": password
-            })
-            self.inner_state.db_connection = db_connection
-            self.refresh_content_layout()
-        except:
-            self.refresh_content_layout()
-            messagebox.showerror("Error", "Invalid username or password")
+        db_connection = DB({
+            "host": address, 
+            "port": port, 
+            "database": database,
+            "user": username, 
+            "password": password
+        })
+        self.inner_state.db_connection = db_connection
+            
         
     def disconnect(self):
         if self.inner_state.db_connection:
@@ -430,4 +455,8 @@ class App(ttk.Window):
         # Content that contains the query input and the query result
         self.content = LayoutContentNotLoggedIn(self, borderwidth=2)
         self.content.pack(side = ttk.TOP, padx=8, pady = 4, fill="both", expand=True)
+
+        # Footer that contains the credits
+        self.footer = LayoutFooter(self, borderwidth=2)
+        self.footer.pack(side = ttk.TOP, padx=8, pady = 4, fill="x")
       
