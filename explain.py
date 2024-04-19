@@ -151,6 +151,7 @@ class Node:
         self.uuid = str(random.random())
         self.node_type = query_plan['Node Type']
         self.startup_cost = query_plan['Startup Cost']
+        self.acutal_row_count = query_plan['Actual Rows'] if 'Actual Rows' in query_plan else ""
         self.total_cost = query_plan['Total Cost']
         self.row_count = query_plan['Plan Rows']
         self.output = query_plan['Output'] if 'Output' in query_plan else ""
@@ -158,6 +159,7 @@ class Node:
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = children
         self.cost_description = self.get_cost_description() 
+        print(self.cost_description)
         
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
@@ -324,16 +326,18 @@ class Node:
 
     def get_cost_description_hash(self): 
         total_cost = self.children[0].total_cost
+        valid = abs(total_cost - self.total_cost) <= epsilon
+        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
             Total cost of Hash {total_cost}. As observed in PostgresSQL, hash cost are passed hence we will do the same.
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            {"" if valid else reason}
         """
         return description
     
     def get_cost_description_hash_join(self): 
-        cpu_tuple_cost = self.db.get_cpu_tuple_cost()
-        cpu_operator_cost = self.db.get_cpu_operator_cost()
-        total_cost = 0
+        total_cost = 3 * 0
 
         description = f"""
             We will be using the formula of Grace Hash Join taught in lecture here: 3(B(R) + B(S))
