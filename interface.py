@@ -359,11 +359,11 @@ class App(ttk.Window):
         self.db_connection = None
         try:
             db_connection = DB({
-                "host": address, 
-                "port": port, 
-                "database": "postgres", # hard coded 
+                "host": 'localhost', 
+                "port": 5432, 
+                "database": "sc3020", # hard coded 
                 "user": username, 
-                "password": password
+                "password": 'PotionCrimson@3270'
             })
             self.inner_state.db_connection = db_connection
             self.refresh_content_layout()

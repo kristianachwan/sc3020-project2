@@ -3,6 +3,7 @@ import graphviz
 import random
 from pprint import pp
 import math
+import re
 
 # this is permissible error from the estimation
 epsilon = 0.1
@@ -144,9 +145,13 @@ class DB:
             statistics[table_name] = self.get_table_statistics(table_name)
         
         return statistics 
+    
+    def get_index_pages(self):
+        pass
 
 class Node: 
     def __init__(self, query_plan, db: DB, children = []): 
+        self.query_plan = query_plan
         self.db = db 
         self.uuid = str(random.random())
         self.node_type = query_plan['Node Type']
@@ -157,7 +162,29 @@ class Node:
         self.filter = query_plan['Filter'] if 'Filter' in query_plan else ""
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = children
-        self.cost_description = self.get_cost_description() 
+        self.cost_description = self.get_cost_description()
+        # self.index_name = self.get_index(query_plan)
+
+    def get_index(self):
+        if self.query_plan['Node Type'] == 'Index Scan':
+            # print("INDEX: ", query_plan['Index Name'])
+            # return query_plan['Index Name']
+            query_plan_str = str(self.query_plan)
+            # Regular expression pattern to match 'Index Name'
+            pattern = r"'Index Name': '([^']+)'"
+            # Search for the pattern in the input string
+            match = re.search(pattern, query_plan_str)
+
+            # Extract the 'Index Name' value if found
+            if match:
+                index_name = match.group(1)
+                print("Index Name:", index_name)
+                return index_name
+            else:
+                print("Index Name not found.")
+                return None
+        else:
+            return None
         
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
@@ -166,8 +193,20 @@ class Node:
             return self.get_cost_description_sequential_scan() 
         elif self.node_type == 'Sort':
             return self.get_sort_cost_description()
+        elif self.node_type == 'Nested Loop':
+            return self.get_nested_loop_join_description()
+        elif self.node_type == 'Index Scan':
+            return self.get_index_scan_description()
         
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
+    
+    def get_index_pages_tuples(self, idx):
+        query = f"SELECT relpages, reltuples FROM pg_class WHERE relname = '{idx}';"
+        results = self.db.execute(query)
+        num_index_pages = results[0][0][0]
+        num_index_tuples = results[0][0][1]
+        # print("RESULTS: ", results, num_index_pages, num_index_tuples)
+        return num_index_pages, num_index_tuples
     
     def get_cost_description_sequential_scan(self): 
         cpu_tuple_cost = self.db.cpu_tuple_cost
@@ -251,7 +290,9 @@ class Node:
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
+            startup_cost = cost_of_last_scan + 2 * cpu_operator_cost * number_of_input_tuples * log2(number_of_input_tuples)
             startup_cost = {startup_cost}
+            run_cost = run cost = cpu_operator_cost *  number_of_input_tuples
             run_cost = {cpu_operator_cost} * {num_input_tuples} = {run_cost}
             total_cost = startup_cost + run_cost = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
@@ -315,7 +356,7 @@ class Node:
 
         startup_cost = 0
 
-        run_cost = (self.db.get_cpu_operator_cost() + self.db.get_cpu_tuple_cost()) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in*num_input_tuples_rel_out + cost_rel_out
+        run_cost = (self.db.cpu_operator_cost + self.db.cpu_operator_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in*num_input_tuples_rel_out + cost_rel_out
         total_cost = startup_cost + run_cost
         
         # Confirmation values from EXPLAIN command
@@ -327,6 +368,73 @@ class Node:
             startup_cost = {startup_cost}
             run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
             total_cost = startup_cost + run_cost = {total_cost}
+            PostgreSQL total_cost = {psql_total_cost}
+            Valid calculation? {"Yes" if valid else "No"}
+            {"" if valid else reason}
+        """
+        return description
+    
+    def get_materialise_description(self):
+        startup_cost = 0
+        run_cost = 2 * self.db.cpu_operator_cost * self.children[0].row_count
+
+        total_cost = (startup_cost * self.children[0].total_cost) + run_cost
+
+        # Confirmation values from EXPLAIN command
+        psql_total_cost = self.total_cost  
+        valid = abs(total_cost - psql_total_cost) <= epsilon
+        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+
+        description = f"""
+            startup_cost = 0
+            startup_cost = {startup_cost}
+            run_cost = 2 * cpu_operator_cost * num_input_tuples
+            run_cost = 2 * {self.db.cpu_operator_cost} * {self.children[0].row_count} = {run_cost}
+            total_cost = (startup_cost * total_cost_of_scan) + run_cost = {total_cost}
+            PostgreSQL total_cost = {psql_total_cost}
+            Valid calculation? {"Yes" if valid else "No"}
+            {"" if valid else reason}
+        """
+        return description
+
+    def get_index_scan_description(self):
+        idx = self.get_index()
+        num_index_pages, num_index_tuples = self.get_index_pages_tuples(idx)
+        print("num_index_tuples", num_index_tuples)
+        # NEED TO FIND
+        index_tree_height = 1
+
+        startup_cost = (math.ceil(math.log2(num_index_tuples)) + (index_tree_height + 1)*50) * self.db.cpu_operator_cost
+
+        page_count = self.db.get_table_page_count(self.relation_name)
+        seq_page_cost = self.db.seq_page_cost
+        # NEED TO FIND
+        selectivity = 0.00001
+        qual_op_cost = 0.0025 # Default value 0.0025
+        # NEED TO FIND
+        indexCorrelation = 1
+        max_io_cost =  page_count*self.db.random_page_cost
+        min_io_cost = self.db.random_page_cost + (math.ceil(selectivity * page_count)-1) * seq_page_cost
+        cpu_index_tuple_cost = 0.005 # cpu_index_tuple_cost by default is 0.005
+
+        index_cpu_cost = selectivity * num_index_tuples * (cpu_index_tuple_cost + qual_op_cost)
+        table_cpu_cost = selectivity * self.db.get_table_row_count(self.relation_name) * self.db.cpu_tuple_cost
+        index_io_cost = math.ceil(selectivity * num_index_pages) * self.db.random_page_cost
+        table_io_cost = max_io_cost + indexCorrelation**2 * (min_io_cost - max_io_cost)
+
+        run_cost = (index_cpu_cost + table_cpu_cost) + (index_io_cost + table_io_cost)
+
+        total_cost = startup_cost + run_cost
+
+        # Confirmation values from EXPLAIN command
+        psql_total_cost = self.total_cost  
+        valid = abs(total_cost - psql_total_cost) <= epsilon
+        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+
+        description = f"""
+            startup_cost = {startup_cost}
+            run_cost = {index_cpu_cost} + {table_cpu_cost} + {index_io_cost} + {table_io_cost} = {run_cost}
+            total_cost = index_cpu_cost + table_cpu_cost + index_io_cost + table_io_cost = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
             Valid calculation? {"Yes" if valid else "No"}
             {"" if valid else reason}
