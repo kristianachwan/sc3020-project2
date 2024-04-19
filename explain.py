@@ -306,8 +306,8 @@ class Node:
         return description
     
     def get_cost_description_aggregate(self): 
-        cpu_tuple_cost = self.db.get_cpu_tuple_cost()
-        cpu_operator_cost = self.db.get_cpu_operator_cost()
+        cpu_tuple_cost = self.db.cpu_tuple_cost
+        cpu_operator_cost = self.db.cpu_operator_cost
         prev_cost = self.children[0].total_cost
         estimated_rows = self.children[0].row_count
         actual_row_count = self.acutal_row_count
