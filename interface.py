@@ -279,8 +279,10 @@ class LayoutHeader(ttk.Labelframe):
                 self.user_entry.entry.config(state="disabled")
                 self.password_entry.entry.config(state="disabled")
             except:
-                self.master.refresh_content_layout()
+                
                 messagebox.showerror("Error", "Invalid username or password")
+            finally:
+                self.master.refresh_content_layout()
 
         self.refresh_connection_status()
         self.refresh_connect_button()
@@ -289,7 +291,6 @@ class LayoutHeader(ttk.Labelframe):
     def refresh_connection_status(self):
         if self.master.inner_state.db_connection:
             self.connected_label.config(text="Connected", style="success.TLabel")
-            self.connect_button_click.after
         else:
             self.connected_label.config(text="Not Connected", style="danger.TLabel")
 
