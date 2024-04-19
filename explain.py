@@ -296,6 +296,43 @@ class Node:
         """
         return description
     
+    def get_nested_loop_join_description(self):
+        # compare sizes of 2 input relations. Smaller relation is rel_out and larger relation is rel_in
+        if self.children[0].row_count < self.children[1].row_count:
+            rel_inner = self.children[1]
+            rel_outer = self.children[0]
+        else:
+            rel_inner = self.children[0]
+            rel_outer = self.children[1]
+
+        # fetch number of tuples from the can of rel_out and rel_in
+        num_input_tuples_rel_out = rel_outer.row_count
+        num_input_tuples_rel_in = rel_inner.row_count
+
+        # fetch number of tuples from the can of rel_out and rel_in
+        cost_rel_out = rel_outer.total_cost
+        cost_rel_in = rel_inner.total_cost
+
+        startup_cost = 0
+
+        run_cost = (self.db.get_cpu_operator_cost() + self.db.get_cpu_tuple_cost()) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in*num_input_tuples_rel_out + cost_rel_out
+        total_cost = startup_cost + run_cost
+        
+        # Confirmation values from EXPLAIN command
+        psql_total_cost = self.total_cost  
+        valid = abs(total_cost - psql_total_cost) <= epsilon
+        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+
+        description = f"""
+            startup_cost = {startup_cost}
+            run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
+            total_cost = startup_cost + run_cost = {total_cost}
+            PostgreSQL total_cost = {psql_total_cost}
+            Valid calculation? {"Yes" if valid else "No"}
+            {"" if valid else reason}
+        """
+        return description
+    
 class Graph:    
     def __init__(self, query_plan, db: DB): 
         self.db = db 
