@@ -208,8 +208,10 @@ class SQLInput(ttk.Frame):
             reset_connection()
             return
         
+        epsilon = float(self.epsilon_input.get())
+
         try:
-            graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection)
+            graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection, epsilon=epsilon)
             self.master.master.master.master.inner_state.graph = graph
 
             graphviz = GraphVisualizer(graph)
@@ -227,10 +229,17 @@ class SQLInput(ttk.Frame):
             start_idx = "1.0"
             while True:
                 start_idx = self.query_input.search(keyword, start_idx, stopindex="end", nocase=1)
+                
                 if not start_idx:
                     break
                 end_idx = f"{start_idx}+{len(keyword)}c"
-                self.query_input.tag_add("keyword", start_idx, end_idx)
+                # Get the previous and next characters
+                prev_char = self.query_input.get(f"{start_idx}-1c")
+                next_char = self.query_input.get(end_idx)
+
+                # Check if they are whitespace characters
+                if (not prev_char or prev_char.isspace()) and (not next_char or next_char.isspace()):
+                    self.query_input.tag_add("keyword", start_idx, end_idx)
                 start_idx = end_idx
     
     def __init__(self, *args, **kwargs):
@@ -243,6 +252,14 @@ class SQLInput(ttk.Frame):
         self.execute_button = ttk.Button(self, text="Execute")
         self.execute_button.pack(side = ttk.BOTTOM, pady=4, padx = 8, anchor=ttk.S)
         self.execute_button.bind("<Button-1>", self.__execute_query)
+
+        
+        self.epsilon_input = Input(self, placeholder="Epsilon", default_value="0.05")
+        self.epsilon_input.pack(side = ttk.RIGHT, pady=4, padx = 8)
+        self.epsilon_label = ttk.Label(self, text="Epsilon", anchor=ttk.W)
+        self.epsilon_label.pack(side = ttk.RIGHT, pady=4, padx = 8)
+
+        # Change self.m
 
         self.query_input.bind("<KeyRelease>", self.highlight_keywords)
 
@@ -279,8 +296,10 @@ class LayoutHeader(ttk.Labelframe):
                 self.user_entry.entry.config(state="disabled")
                 self.password_entry.entry.config(state="disabled")
             except:
-                self.master.refresh_content_layout()
+                
                 messagebox.showerror("Error", "Invalid username or password")
+            finally:
+                self.master.refresh_content_layout()
 
         self.refresh_connection_status()
         self.refresh_connect_button()
@@ -289,7 +308,6 @@ class LayoutHeader(ttk.Labelframe):
     def refresh_connection_status(self):
         if self.master.inner_state.db_connection:
             self.connected_label.config(text="Connected", style="success.TLabel")
-            self.connect_button_click.after
         else:
             self.connected_label.config(text="Not Connected", style="danger.TLabel")
 
@@ -422,11 +440,15 @@ class App(ttk.Window):
     def refresh_content_layout(self):
         # Used to re-render the entirety of the content layout to its default state
         self.content.pack_forget()
+        self.footer.pack_forget()
         if self.inner_state.db_connection:
             self.content = LayoutContent(self, borderwidth=2)
         else:
             self.content = LayoutContentNotLoggedIn(self, borderwidth=2)
         self.content.pack(side = ttk.TOP, padx=8, pady = 4, fill="both", expand=True)
+        
+        self.footer = LayoutFooter(self, borderwidth=2)
+        self.footer.pack(side = ttk.TOP, padx=8, pady = 4, fill="x")
 
 
     def login(self, address, database, port, username, password):
