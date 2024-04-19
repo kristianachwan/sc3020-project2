@@ -20,6 +20,8 @@ class DB:
         self.cpu_tuple_cost = self.get_cpu_tuple_cost() 
         self.random_page_cost = self.get_random_page_cost()
         self.cpu_operator_cost = self.get_cpu_operator_cost()
+        self.parallel_setup_cost = self.get_parallel_setup_cost()
+        self.parallel_tuple_cost = self.get_parallel_tuple_cost()
         self.statistics = self.get_statistics()
 
         """ 
@@ -40,12 +42,10 @@ class DB:
                     RAISE NOTICE 'ANALYZE has already been run on some tables.';
                 END IF;
             END $$;
-        """)
-    def close_connection(self):
-        self.cursor.close()
-        self.connection.close() 
+        """) 
 
     def reset_connection(self):
+        self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
         self.cursor = self.connection.cursor()
         
     def get_query_plan(self, query: str): 
@@ -75,6 +75,16 @@ class DB:
     def get_cpu_operator_cost(self): 
         return float(self.execute("""
                 show cpu_operator_cost;
+            """)[0][0][0])
+    
+    def get_parallel_setup_cost(self): 
+        return float(self.execute("""
+                show parallel_setup_cost;
+            """)[0][0][0])
+    
+    def get_parallel_tuple_cost(self): 
+        return float(self.execute("""
+                show parallel_tuple_cost;
             """)[0][0][0])
 
     def get_table_statistics(self, table_name): 
@@ -175,6 +185,8 @@ class Node:
             return self.get_cost_description_aggregate() 
         elif self.node_type == 'Hash Join':
             return self.get_cost_description_hash_join() 
+        elif self.node_type == 'Gather':
+            return self.get_cost_description_gather() 
         
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
@@ -343,6 +355,34 @@ class Node:
         description = f"""
             We will be using the formula of Grace Hash Join taught in lecture here: 3(B(R) + B(S))
             Total cost of Hash Join {total_cost}
+        """
+        return description
+    
+    def get_cost_description_gather(self): 
+        parallel_setup_cost = self.db.parallel_setup_cost
+        parallel_tuple_cost = self.db.parallel_tuple_cost
+        prev_startup_cost = self.children[0].startup_cost
+        prev_total_cost = self.children[0].total_cost
+        planned_row = self.row_count
+        startup_cost = prev_startup_cost + parallel_setup_cost
+        run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * self.row_count)
+        total_cost = startup_cost + run_cost
+        valid = abs(total_cost - self.total_cost) <= epsilon
+        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+
+        description = f"""
+            Total cost of Gather
+             startup_cost = startup_cost + parallel_setup_cost
+                = {prev_startup_cost} + {parallel_setup_cost}
+                = {startup_cost}
+             run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * planned_row)
+                = ({prev_total_cost} - {prev_startup_cost}) + ({parallel_tuple_cost} * {planned_row})
+                = {run_cost}
+             total cost = (startup_cost) + (run_cost)
+                = ({startup_cost} + {run_cost})
+                = {total_cost}
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            {"" if valid else reason}
         """
         return description
     
