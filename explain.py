@@ -153,7 +153,7 @@ class Node:
         self.startup_cost = query_plan['Startup Cost']
         self.total_cost = query_plan['Total Cost']
         self.row_count = query_plan['Plan Rows']
-        self.output = query_plan['Output']
+        self.output = query_plan['Output'] if 'Output' in query_plan else ""
         self.filter = query_plan['Filter'] if 'Filter' in query_plan else ""
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = [] 
@@ -166,6 +166,12 @@ class Node:
             return self.get_cost_description_sequential_scan() 
         elif self.node_type == 'Sort':
             return self.get_sort_cost_description()
+        elif self.node_type == 'Hash':
+            return self.get_cost_description_hash() 
+        elif self.node_type == 'Aggregate':
+            return self.get_cost_description_aggregate() 
+        elif self.node_type == 'Hash Join':
+            return self.get_cost_description_hash_join() 
         
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
@@ -293,6 +299,45 @@ class Node:
             PostgreSQL total_cost = {psql_total_cost}
             Valid calculation? {"Yes" if valid else "No"}
             {"" if valid else reason}
+        """
+        return description
+    
+    def get_cost_description_aggregate(self): 
+        cpu_tuple_cost = self.db.get_cpu_tuple_cost()
+        cpu_operator_cost = self.db.get_cpu_operator_cost()
+        prev_cost = self.children[0].total_cost
+        estimated_rows = self.children[0].row_count
+        actual_row_count = self.acutal_row_count
+        total_cost = prev_cost + (estimated_rows * cpu_operator_cost) + (actual_row_count * cpu_tuple_cost)
+        valid = abs(total_cost - self.total_cost) <= epsilon
+        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+
+        description = f"""
+            Total cost of Aggregate
+                = (cost of Seq Scan) + (estimated rows processed * cpu_operator_cost) + (estimated rows returned * cpu_tuple_cost)
+                = ({prev_cost}) + (1 * {cpu_operator_cost}) + ({actual_row_count} * {cpu_tuple_cost}) 
+                = {total_cost}
+                is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+                {"" if valid else reason}
+        """
+        return description
+
+    def get_cost_description_hash(self): 
+        total_cost = self.children[0].total_cost
+
+        description = f"""
+            Total cost of Hash {total_cost}. As observed in PostgresSQL, hash cost are passed hence we will do the same.
+        """
+        return description
+    
+    def get_cost_description_hash_join(self): 
+        cpu_tuple_cost = self.db.get_cpu_tuple_cost()
+        cpu_operator_cost = self.db.get_cpu_operator_cost()
+        total_cost = 0
+
+        description = f"""
+            We will be using the formula of Grace Hash Join taught in lecture here: 3(B(R) + B(S))
+            Total cost of Hash Join {total_cost}
         """
         return description
     
