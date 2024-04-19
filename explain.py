@@ -204,8 +204,7 @@ class Node:
         startup_cost = 0
         run_cost = (cpu_tuple_cost) * row_count + seq_page_cost * page_count
         total_cost = startup_cost + run_cost 
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
-        self.valid = valid
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -220,8 +219,8 @@ class Node:
 
             psql_total_cost = {self.total_cost}
                                   
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
 
         return description
@@ -235,8 +234,7 @@ class Node:
         startup_cost = 0
         run_cost = (cpu_tuple_cost + cpu_operator_cost) * row_count + seq_page_cost * page_count
         total_cost = startup_cost + run_cost 
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
-        self.valid = valid
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -251,8 +249,8 @@ class Node:
 
             psql_total_cost = {self.total_cost}
 
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
     
@@ -276,8 +274,7 @@ class Node:
         
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - psql_total_cost) <= self.epsilon
-        self.valid = valid
+        self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
@@ -285,8 +282,8 @@ class Node:
             run_cost = {cpu_operator_cost} * {num_input_tuples} = {run_cost}
             total_cost = startup_cost + run_cost = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            Valid calculation? {"Yes" if valid else "No"}
-            {"" if valid else reason}
+            Valid calculation? {"Yes" if self.valid else "No"}
+            {"" if self.valid else reason}
         """
         return description
     
@@ -313,14 +310,116 @@ class Node:
         
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - psql_total_cost) <= self.epsilon
-        self.valid = valid
+        self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
             startup_cost = {startup_cost}
             run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
             total_cost = startup_cost + run_cost = {total_cost}
+            PostgreSQL total_cost = {psql_total_cost}
+            Valid calculation? {"Yes" if self.alid else "No"}
+            {"" if self.valid else reason}
+        """
+        return description
+    
+    def get_nested_loop_join_description(self):
+        # compare sizes of 2 input relations. Smaller relation is rel_out and larger relation is rel_in
+        if self.children[0].row_count < self.children[1].row_count:
+            rel_inner = self.children[1]
+            rel_outer = self.children[0]
+        else:
+            rel_inner = self.children[0]
+            rel_outer = self.children[1]
+
+        # fetch number of tuples from the can of rel_out and rel_in
+        num_input_tuples_rel_out = rel_outer.row_count
+        num_input_tuples_rel_in = rel_inner.row_count
+
+        # fetch number of tuples from the can of rel_out and rel_in
+        cost_rel_out = rel_outer.total_cost
+        cost_rel_in = rel_inner.total_cost
+
+        startup_cost = 0
+
+        run_cost = (self.db.cpu_operator_cost + self.db.cpu_operator_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in*num_input_tuples_rel_out + cost_rel_out
+        total_cost = startup_cost + run_cost
+
+        # Confirmation values from EXPLAIN command
+        psql_total_cost = self.total_cost  
+        self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
+        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+
+        description = f"""
+            startup_cost = {startup_cost}
+            run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
+            total_cost = startup_cost + run_cost = {total_cost}
+            PostgreSQL total_cost = {psql_total_cost}
+            Valid calculation? {"Yes" if self.valid else "No"}
+            {"" if self.valid else reason}
+        """
+        return description
+
+    def get_materialise_description(self):
+        startup_cost = 0
+        run_cost = 2 * self.db.cpu_operator_cost * self.children[0].row_count
+
+        total_cost = (startup_cost * self.children[0].total_cost) + run_cost
+
+        # Confirmation values from EXPLAIN command
+        psql_total_cost = self.total_cost  
+        self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
+        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+
+        description = f"""
+            startup_cost = 0
+            startup_cost = {startup_cost}
+            run_cost = 2 * cpu_operator_cost * num_input_tuples
+            run_cost = 2 * {self.db.cpu_operator_cost} * {self.children[0].row_count} = {run_cost}
+            total_cost = (startup_cost * total_cost_of_scan) + run_cost = {total_cost}
+            PostgreSQL total_cost = {psql_total_cost}
+            Valid calculation? {"Yes" if self.valid else "No"}
+            {"" if self.valid else reason}
+        """
+        return description
+
+    # unfinished
+    def get_index_scan_description(self):
+        idx = self.get_index()
+        num_index_pages, num_index_tuples = self.get_index_pages_tuples(idx)
+        print("num_index_tuples", num_index_tuples)
+        # NEED TO FIND
+        index_tree_height = 1
+        startup_cost = (math.ceil(math.log2(num_index_tuples)) + (index_tree_height + 1)*50) * self.db.cpu_operator_cost
+        page_count = self.db.get_table_page_count(self.relation_name)
+        seq_page_cost = self.db.seq_page_cost
+        # NEED TO FIND
+        selectivity = 0.00001
+        qual_op_cost = 0.0025 # Default value 0.0025
+        # NEED TO FIND
+        indexCorrelation = 1
+        max_io_cost =  page_count*self.db.random_page_cost
+        min_io_cost = self.db.random_page_cost + (math.ceil(selectivity * page_count)-1) * seq_page_cost
+        cpu_index_tuple_cost = 0.005 # cpu_index_tuple_cost by default is 0.005
+
+        index_cpu_cost = selectivity * num_index_tuples * (cpu_index_tuple_cost + qual_op_cost)
+        table_cpu_cost = selectivity * self.db.get_table_row_count(self.relation_name) * self.db.cpu_tuple_cost
+        index_io_cost = math.ceil(selectivity * num_index_pages) * self.db.random_page_cost
+        table_io_cost = max_io_cost + indexCorrelation**2 * (min_io_cost - max_io_cost)
+
+        run_cost = (index_cpu_cost + table_cpu_cost) + (index_io_cost + table_io_cost)
+
+        total_cost = startup_cost + run_cost
+
+        # Confirmation values from EXPLAIN command
+        psql_total_cost = self.total_cost  
+        valid = abs(total_cost - psql_total_cost) <= self.epsilon
+        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+
+        description = f"""
+            startup_cost = {startup_cost}
+            run_cost = {index_cpu_cost} + {table_cpu_cost} + {index_io_cost} + {table_io_cost} = {run_cost}
+            total_cost = index_cpu_cost + table_cpu_cost + index_io_cost + table_io_cost = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
             Valid calculation? {"Yes" if valid else "No"}
             {"" if valid else reason}
@@ -334,8 +433,7 @@ class Node:
         estimated_rows = self.children[0].row_count
         actual_row_count = self.acutal_row_count
         total_cost = prev_cost + (estimated_rows * cpu_operator_cost) + (actual_row_count * cpu_tuple_cost)
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
-        self.valid = valid
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -343,24 +441,25 @@ class Node:
                 = (cost of Seq Scan) + (estimated rows processed * cpu_operator_cost) + (estimated rows returned * cpu_tuple_cost)
                 = ({prev_cost}) + (1 * {cpu_operator_cost}) + ({actual_row_count} * {cpu_tuple_cost}) 
                 = {total_cost}
-                is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-                {"" if valid else reason}
+                is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+                {"" if self.valid else reason}
         """
         return description
 
+    # unfinished
     def get_cost_description_hash(self): 
         total_cost = self.children[0].total_cost
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
-        self.valid = valid
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
             Total cost of Hash {total_cost}. As observed in PostgresSQL, hash cost are passed hence we will do the same.
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
     
+    # unfinished
     def get_cost_description_hash_join(self): 
         total_cost = 3 * 0
 
@@ -379,8 +478,7 @@ class Node:
         startup_cost = prev_startup_cost + parallel_setup_cost
         run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * self.row_count)
         total_cost = startup_cost + run_cost
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
-        self.valid = valid
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -394,8 +492,8 @@ class Node:
              total cost = (startup_cost) + (run_cost)
                 = ({startup_cost} + {run_cost})
                 = {total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
     
