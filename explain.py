@@ -421,8 +421,9 @@ class GraphVisualizer:
 
     def parse_graph(self, node):
         if not node.valid: 
-            self.graphviz.node(node.uuid, node.node_type, fillcolor='red', style='filled')
-        else: self.graphviz.node(node.uuid, node.node_type, fillcolor='green', style='filled')
+            self.graphviz.node(node.uuid, node.node_type, fillcolor='cyan', style='filled')
+        else: 
+            self.graphviz.node(node.uuid, node.node_type, fillcolor='green', style='filled')
         if node.children: 
             for child in node.children: 
                 self.graphviz.node(child.uuid, child.node_type)
