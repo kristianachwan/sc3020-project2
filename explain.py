@@ -4,8 +4,6 @@ import random
 from pprint import pp
 import math
 
-# this is permissible error from the estimation
-epsilon = 0.1
 class DB: 
     def __init__(self, config): 
         self.host = config['host']
@@ -158,7 +156,7 @@ class DB:
         return statistics 
 
 class Node: 
-    def __init__(self, query_plan, db: DB, children = []): 
+    def __init__(self, query_plan, db: DB, children, epsilon): 
         self.db = db 
         self.uuid = str(random.random())
         self.node_type = query_plan['Node Type']
@@ -171,6 +169,7 @@ class Node:
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = children
         self.cost_description = self.get_cost_description() 
+        self.epsilon = epsilon
         
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
@@ -198,7 +197,7 @@ class Node:
         startup_cost = 0
         run_cost = (cpu_tuple_cost) * row_count + seq_page_cost * page_count
         total_cost = startup_cost + run_cost 
-        valid = abs(total_cost - self.total_cost) <= epsilon
+        valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -213,7 +212,7 @@ class Node:
 
             psql_total_cost = {self.total_cost}
                                   
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
             {"" if valid else reason}
         """
 
@@ -228,7 +227,7 @@ class Node:
         startup_cost = 0
         run_cost = (cpu_tuple_cost + cpu_operator_cost) * row_count + seq_page_cost * page_count
         total_cost = startup_cost + run_cost 
-        valid = abs(total_cost - self.total_cost) <= epsilon
+        valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -243,7 +242,7 @@ class Node:
 
             psql_total_cost = {self.total_cost}
 
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
             {"" if valid else reason}
         """
         return description
@@ -268,7 +267,7 @@ class Node:
         
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - psql_total_cost) <= epsilon
+        valid = abs(total_cost - psql_total_cost) <= self.epsilon
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
@@ -304,7 +303,7 @@ class Node:
         
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - psql_total_cost) <= epsilon
+        valid = abs(total_cost - psql_total_cost) <= self.epsilon
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
@@ -324,7 +323,7 @@ class Node:
         estimated_rows = self.children[0].row_count
         actual_row_count = self.acutal_row_count
         total_cost = prev_cost + (estimated_rows * cpu_operator_cost) + (actual_row_count * cpu_tuple_cost)
-        valid = abs(total_cost - self.total_cost) <= epsilon
+        valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -332,19 +331,19 @@ class Node:
                 = (cost of Seq Scan) + (estimated rows processed * cpu_operator_cost) + (estimated rows returned * cpu_tuple_cost)
                 = ({prev_cost}) + (1 * {cpu_operator_cost}) + ({actual_row_count} * {cpu_tuple_cost}) 
                 = {total_cost}
-                is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+                is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
                 {"" if valid else reason}
         """
         return description
 
     def get_cost_description_hash(self): 
         total_cost = self.children[0].total_cost
-        valid = abs(total_cost - self.total_cost) <= epsilon
+        valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
             Total cost of Hash {total_cost}. As observed in PostgresSQL, hash cost are passed hence we will do the same.
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
             {"" if valid else reason}
         """
         return description
@@ -387,8 +386,9 @@ class Node:
         return description
     
 class Graph:    
-    def __init__(self, query_plan, db: DB): 
+    def __init__(self, query_plan, db: DB, epsilon): 
         self.db = db 
+        self.epsilon = epsilon
         self.root = self.parse_query_plan(query_plan)
     
     def parse_query_plan(self, query_plan):
@@ -397,7 +397,7 @@ class Graph:
             for child_query_plan in query_plan['Plans']: 
                 children.append(self.parse_query_plan(child_query_plan)) 
 
-        node = Node(query_plan, self.db, children)
+        node = Node(query_plan, self.db, children, self.epsilon)
         return node 
     
 class GraphVisualizer: 
