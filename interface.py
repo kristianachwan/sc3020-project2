@@ -209,7 +209,7 @@ class SQLInput(ttk.Frame):
             return
         
         try:
-            graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection)
+            graph = Graph(query_plan, self.master.master.master.master.inner_state.db_connection, 0.05)
             self.master.master.master.master.inner_state.graph = graph
 
             graphviz = GraphVisualizer(graph)
@@ -243,6 +243,12 @@ class SQLInput(ttk.Frame):
         self.execute_button = ttk.Button(self, text="Execute")
         self.execute_button.pack(side = ttk.BOTTOM, pady=4, padx = 8, anchor=ttk.S)
         self.execute_button.bind("<Button-1>", self.__execute_query)
+
+        
+        self.episolon_input = Input(self, placeholder="Epsilon", default_value="0.05")
+        self.episolon_input.pack(side = ttk.RIGHT, pady=4, padx = 8)
+        self.episolon_label = ttk.Label(self, text="Epsilon", anchor=ttk.W)
+        self.episolon_label.pack(side = ttk.RIGHT, pady=4, padx = 8)
 
         self.query_input.bind("<KeyRelease>", self.highlight_keywords)
 
