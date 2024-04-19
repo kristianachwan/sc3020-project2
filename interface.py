@@ -126,9 +126,9 @@ class QueryTable(ttk.Frame):
         self.notebook = ttk.Notebook(self, height=1000)
         self.notebook.pack(side = ttk.TOP, fill="both", expand=True)
 
-        self.query_table = ttk.Frame(self.notebook, width=480, height=1000)
+        self.query_table = ttk.Frame(self.notebook, width=720, height=1000)
         self.query_table.pack(fill="y")
-        db_con: DB = self.master.master.master.inner_state.db_connection
+        db_con: DB = self.master.master.master.master.inner_state.db_connection
         statistic = db_con.get_statistics()
 
         # Generate table for Relation Statistics
@@ -161,11 +161,11 @@ class QueryTable(ttk.Frame):
         self.schema_table = ttk.Treeview(self.schema_table_frame, columns=["Relation", "Column"], show="tree headings")
         self.schema_table.pack(fill="both", expand=True)
 
-        self.schema_table.column("#0", width=1, anchor=tk.W)
+        self.schema_table.column("#0", width=1, anchor=tk.W, stretch=0)
         self.schema_table.heading("#1", text="Relation")
-        self.schema_table.column("#1", width=15, anchor=tk.W)
+        self.schema_table.column("#1", width=1, anchor=tk.W, stretch=0)
         self.schema_table.heading("#2", text="Column")
-        self.schema_table.column("#2", width=10, anchor=tk.W)
+        self.schema_table.column("#2", width=1, anchor=tk.W, stretch=0)
 
         for relation in relations:
             columns = db_con.get_column_names(relation)
@@ -245,7 +245,7 @@ class SQLInput(ttk.Frame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
-        self.query_input = ttk.Text(self, width=50, font=("Consolas", 12), wrap="word")
+        self.query_input = ttk.Text(self, width=50, font=("Courier", 12), wrap="word")
         self.query_input.pack(side = ttk.TOP, pady=4, padx = 8, fill="x", expand=True)
         self.query_input.tag_configure("keyword", foreground="#9090f5")
 
@@ -401,15 +401,17 @@ class LayoutContent(ttk.Frame):
         self.second_row = ttk.Frame(self, height=100)
         self.second_row.pack(side = ttk.TOP, fill="both", expand=True)
 
+        self.query_table_frame = ttk.Frame(self.second_row, borderwidth=2)
+        self.query_table_frame.pack(side = ttk.LEFT, fill="both", expand=True)
 
-        self.query_table = QueryTable(self.second_row, width=480)
+        self.query_table = QueryTable(self.query_table_frame, width=720)
         self.query_table.pack(pady=4, padx = 8, fill="x", side = ttk.LEFT, expand=True)
 
         self.query_explanation_frame = ttk.LabelFrame(self.second_row, borderwidth=2, text="Query Explanation")
-        self.query_explanation_frame.pack(side = ttk.LEFT, fill="x", pady=4)
+        self.query_explanation_frame.pack(side = ttk.LEFT, pady=4)
 
         self.query_explanation = QueryExplanation(self.query_explanation_frame)
-        self.query_explanation.pack(pady=4, padx = 8, fill="x")
+        self.query_explanation.pack(pady=4, padx = 8)
 
 class LayoutFooter(ttk.Frame):
     def __init__(self, *args, **kwargs):
@@ -430,7 +432,8 @@ class App(ttk.Window):
     def __init__(self, inner_state: InnerState): 
         super().__init__(self, themename="darkly")
 
-        self.title("SC3020 Project 2")
+        self.title("QUPEX - Query Plan Explorer")
+        self.iconbitmap("icon.ico")
         self.geometry("1280x900")
         self.minsize(1024, 800)
         self.inner_state = inner_state
