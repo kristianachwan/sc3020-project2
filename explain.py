@@ -15,6 +15,11 @@ class DB:
         self.password = config['password']
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
         self.cursor = self.connection.cursor()
+        self.block_size = self.get_block_size()
+        self.seq_page_cost = self.get_seq_page_cost()
+        self.cpu_tuple_cost = self.get_cpu_tuple_cost() 
+        self.random_page_cost = self.get_random_page_cost()
+        self.cpu_operator_cost = self.get_cpu_operator_cost()
         self.statistics = self.get_statistics()
 
         """ 
@@ -48,6 +53,11 @@ class DB:
     def get_cpu_tuple_cost(self):
         return float(self.execute("""
                 show cpu_tuple_cost;
+            """)[0][0][0])
+
+    def get_block_size(self): 
+        return int(self.execute("""
+                select current_setting('block_size');
             """)[0][0][0])
     
     def get_seq_page_cost(self):
@@ -155,14 +165,14 @@ class Node:
                 return self.get_cost_description_sequential_scan_with_filter() 
             return self.get_cost_description_sequential_scan() 
         elif self.node_type == 'Sort':
-            desc = self.get_sort_cost_description()
+            return self.get_sort_cost_description()
         
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
     def get_cost_description_sequential_scan(self): 
-        cpu_tuple_cost = self.db.get_cpu_tuple_cost()
+        cpu_tuple_cost = self.db.cpu_tuple_cost
         row_count = self.db.get_table_row_count(self.relation_name)
-        seq_page_cost = self.db.get_seq_page_cost()
+        seq_page_cost = self.db.seq_page_cost
         page_count = self.db.get_table_page_count(self.relation_name)
         startup_cost = 0
         run_cost = (cpu_tuple_cost) * row_count + seq_page_cost * page_count
@@ -189,10 +199,10 @@ class Node:
         return description
     
     def get_cost_description_sequential_scan_with_filter(self): 
-        cpu_tuple_cost = self.db.get_cpu_tuple_cost()
-        cpu_operator_cost = self.db.get_cpu_operator_cost()
+        cpu_tuple_cost = self.db.cpu_tuple_cost
+        cpu_operator_cost = self.db.cpu_operator_cost
         row_count = self.db.get_table_row_count(self.relation_name)
-        seq_page_cost = self.db.get_seq_page_cost()
+        seq_page_cost = self.db.seq_page_cost
         page_count = self.db.get_table_page_count(self.relation_name)
         startup_cost = 0
         run_cost = (cpu_tuple_cost + cpu_operator_cost) * row_count + seq_page_cost * page_count
@@ -220,11 +230,11 @@ class Node:
     # Sort cost = start_up cost + run cost
     # start_up cost = cost_of_last_scan + 2 * cpu_operator_cost * number_of_input_tuples * log2(number_of_input_tuples)
         # cost_of_last_scan -> can write function to fetch it. For now just assume some constant value
-        # cpu_operator_cost -> db.get_cpu_operator_cost() or default value is 0.0025
+        # cpu_operator_cost -> db.cpu_operator_cost or default value is 0.0025
         # number_of_input_tuples -> fetch 'rows' attribute of sequential scan
     # run cost = cpu_operator_cost *  number_of_input_tuples
     def get_sort_cost_description(self):
-        cpu_operator_cost = self.db.get_cpu_operator_cost() # if this doesn't work then the default value is 0.0025
+        cpu_operator_cost = self.db.cpu_operator_cost # if this doesn't work then the default value is 0.0025
         comparison_cost = 2 * cpu_operator_cost
         num_input_tuples = self.children[0].row_count # fetch number of tuples returned from the scan operator cost. 
         log_sort_tuples = math.log2(num_input_tuples)
