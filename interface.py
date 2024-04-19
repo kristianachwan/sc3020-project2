@@ -394,6 +394,14 @@ class LayoutContent(ttk.Frame):
         self.query_explanation = QueryExplanation(self.query_explanation_frame)
         self.query_explanation.pack(pady=4, padx = 8, fill="x")
 
+class LayoutFooter(ttk.Frame):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pack()
+
+        self.label = ttk.Label(self, text="Made with <3 by Team 1", anchor=ttk.CENTER, foreground="grey")
+        self.label.pack(side = ttk.TOP, fill="both", expand=True)
+
 ### APPLICATION LOGIC ###
 class InnerState:
     # Define the global variables here
@@ -447,4 +455,8 @@ class App(ttk.Window):
         # Content that contains the query input and the query result
         self.content = LayoutContentNotLoggedIn(self, borderwidth=2)
         self.content.pack(side = ttk.TOP, padx=8, pady = 4, fill="both", expand=True)
+
+        # Footer that contains the credits
+        self.footer = LayoutFooter(self, borderwidth=2)
+        self.footer.pack(side = ttk.TOP, padx=8, pady = 4, fill="x")
       
