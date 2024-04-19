@@ -173,6 +173,7 @@ class Node:
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
         self.children = children
         self.epsilon = epsilon
+        self.valid = False
         self.cost_description = self.get_cost_description() 
         
     def get_cost_description(self): 
@@ -202,6 +203,7 @@ class Node:
         run_cost = (cpu_tuple_cost) * row_count + seq_page_cost * page_count
         total_cost = startup_cost + run_cost 
         valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = valid
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -232,6 +234,7 @@ class Node:
         run_cost = (cpu_tuple_cost + cpu_operator_cost) * row_count + seq_page_cost * page_count
         total_cost = startup_cost + run_cost 
         valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = valid
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -272,6 +275,7 @@ class Node:
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
         valid = abs(total_cost - psql_total_cost) <= self.epsilon
+        self.valid = valid
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
@@ -308,6 +312,7 @@ class Node:
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
         valid = abs(total_cost - psql_total_cost) <= self.epsilon
+        self.valid = valid
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
@@ -328,6 +333,7 @@ class Node:
         actual_row_count = self.acutal_row_count
         total_cost = prev_cost + (estimated_rows * cpu_operator_cost) + (actual_row_count * cpu_tuple_cost)
         valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = valid
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -343,6 +349,7 @@ class Node:
     def get_cost_description_hash(self): 
         total_cost = self.children[0].total_cost
         valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = valid
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -371,6 +378,7 @@ class Node:
         run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * self.row_count)
         total_cost = startup_cost + run_cost
         valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = valid
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -412,8 +420,9 @@ class GraphVisualizer:
         self.graphviz.render('qep')
 
     def parse_graph(self, node):
-        self.graphviz.node(node.uuid, node.node_type)
-
+        if not node.valid: 
+            self.graphviz.node(node.uuid, node.node_type, fillcolor='red', style='filled')
+        else: self.graphviz.node(node.uuid, node.node_type, fillcolor='green', style='filled')
         if node.children: 
             for child in node.children: 
                 self.graphviz.node(child.uuid, child.node_type)
