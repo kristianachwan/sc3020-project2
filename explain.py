@@ -136,7 +136,7 @@ class DB:
         return statistics 
 
 class Node: 
-    def __init__(self, query_plan, db: DB): 
+    def __init__(self, query_plan, db: DB, children = []): 
         self.db = db 
         self.uuid = str(random.random())
         self.node_type = query_plan['Node Type']
@@ -292,11 +292,12 @@ class Graph:
         self.root = self.parse_query_plan(query_plan)
     
     def parse_query_plan(self, query_plan):
-        node = Node(query_plan, self.db)
+        children = []
         if 'Plans' in query_plan: 
             for child_query_plan in query_plan['Plans']: 
-                node.children.append(self.parse_query_plan(child_query_plan)) 
+                children.append(self.parse_query_plan(child_query_plan)) 
 
+        node = Node(query_plan, self.db, children)
         return node 
     
 class GraphVisualizer: 
