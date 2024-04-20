@@ -509,7 +509,7 @@ class Node:
 
         avg_data_blocks = row_count / branching_factor * 0.5
 
-        avg_cost = (height_of_index + avg_data_blocks + row_count / 2) * self.db.random_page_cost
+        avg_cost = (height_of_index + avg_data_blocks + self.db.get_table_page_count(self.relation_name) / 2) * self.db.random_page_cost
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
@@ -530,16 +530,16 @@ class Node:
                                 = {num_index_tuples / num_index_pages} (number of branch = number of tuples in a block)
 
             height_of_index     = log(num_index_pages) / log(branching_factor)
-                                = log({num_index_pages}) / log({branching_factor})
-                                = {math.log(num_index_pages) / math.log(branching_factor)}
+                                    = log({num_index_pages}) / log({branching_factor})
+                                    = {math.log(num_index_pages) / math.log(branching_factor)}
 
             avg_data_blocks     = row_count / branching_factor * 0.5
-                                = {row_count} / {branching_factor} * 0.5
-                                = {row_count / branching_factor * 0.5}
+                                    = {row_count} / {branching_factor} * 0.5
+                                    = {row_count / branching_factor * 0.5}
 
-            avg_cost            = (height_of_index + avg_data_blocks + row_count / 2) * random_page_cost
-                                = {height_of_index} + {row_count / branching_factor * 0.5} + {row_count / 2} * {self.db.random_page_cost}
-                                = {avg_cost}
+            avg_cost            = (height_of_index + avg_data_blocks + rel_pages / 2) * random_page_cost
+                                    = {height_of_index} + {row_count / branching_factor * 0.5} + {self.db.get_table_page_count(self.relation_name) / 2} * {self.db.random_page_cost}
+                                    = {avg_cost}
 
                                 
             total_cost              = {avg_cost}
