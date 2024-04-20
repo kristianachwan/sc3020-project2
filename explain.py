@@ -372,7 +372,7 @@ class Node:
         run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
         total_cost = startup_cost + run_cost = {total_cost}
         PostgreSQL total_cost = {psql_total_cost}
-        Valid calculation? {"Yes" if self.alid else "No"}
+        Valid calculation? {"Yes" if self.valid else "No"}
         {"" if self.valid else reason}
         """
         return description
