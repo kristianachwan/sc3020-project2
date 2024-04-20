@@ -239,7 +239,7 @@ class Node:
     # Lecture + PostgreSQL documentation
     def get_cost_description_sequential_scan(self): 
         cpu_tuple_cost = self.db.cpu_tuple_cost
-        row_count = self.db.get_table_row_count(self.relation_name)
+        row_count = self.row_count
         seq_page_cost = self.db.seq_page_cost
         page_count = self.db.get_table_page_count(self.relation_name)
         startup_cost = 0
