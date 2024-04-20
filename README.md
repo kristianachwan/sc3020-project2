@@ -11,29 +11,16 @@
 
 ## Installation Guides
 
-1. It is recommended to use `venv` to isolate the project's dependency to your local machine. To activate it, run:
-
-```
-source .venv/bin/activate
-```
-
-2. Install dependencies with the command:
+1. Install dependencies with the command:
 
 ```
 pip install -r requirements.txt
 ```
 
-3. Run the `project.py`
+2. Run the `project.py`
 
 ```
 python project.py
-```
-
-Note:
-If you wish to deactivate the virtual environment, simply run:
-
-```
-deactivate
 ```
 
 ## Tech Stack
