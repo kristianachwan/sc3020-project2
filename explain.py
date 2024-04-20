@@ -23,7 +23,6 @@ class DB:
         self.parallel_setup_cost = self.get_parallel_setup_cost()
         self.parallel_tuple_cost = self.get_parallel_tuple_cost()
         self.statistics = self.get_statistics()
-        self.tables_block = self.get_tables_block()
         self.work_mem = self.get_work_mem()
 
         """ 
@@ -168,28 +167,7 @@ class DB:
             statistics[table_name] = self.get_table_statistics(table_name)
         
         return statistics 
-    
-    def get_tables_block(self):
-        query_results = self.execute(
-            """
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_schema = current_schema()
-                AND table_type = 'BASE TABLE';
-            """
-        )
-
-        table_names = {}
-
-        for table_name in query_results[0]:
-            name = table_name[0]
-            blocks_query = f"SELECT pg_relation_size('{name}') / current_setting('block_size')::int AS num_blocks"
-            blocks_result = self.execute(blocks_query)
-            num_blocks = blocks_result[0]
-            table_names[name] = num_blocks[0][0]
-
-        return table_names
-    
+        
     def get_work_mem(self):
         return int(self.execute("""
             SELECT setting::bigint * CASE unit
@@ -402,42 +380,87 @@ class Node:
             rel_inner = self.children[0]
             rel_outer = self.children[1]
 
-        # fetch number of tuples from the can of rel_out and rel_in
-        num_input_tuples_rel_out = rel_outer.row_count
+            num_input_tuples_rel_out = rel_outer.row_count
         num_input_tuples_rel_in = rel_inner.row_count
 
-        # fetch size of tuples from the can of rel_out and rel_in
         size_tuple_rel_out = rel_outer.row_width
         size_tuple_rel_in = rel_inner.row_width
 
-        # calculate the number of blocks for each relation
-        num_blocks_rel_out = math.ceil(size_tuple_rel_out / self.db.block_size)
-        num_blocks_rel_in = math.ceil(size_tuple_rel_in / self.db.block_size)
+        num_blocks_rel_out = math.ceil(size_tuple_rel_out * num_input_tuples_rel_out / self.db.block_size)
+        num_blocks_rel_in = math.ceil(size_tuple_rel_in * num_input_tuples_rel_in / self.db.block_size)
 
-        # fetch number of tuples from the can of rel_out and rel_in
         cost_rel_out = rel_outer.total_cost
         cost_rel_in = rel_inner.total_cost
 
         startup_cost = 0
+        run_cost = 0
+        description = ""
+        underestimate_reason = """
+            The answer is underestimate due to the lack of information to the details needed to calculatae the intricate costs in Postgres.
+        """
 
-        run_cost = (self.db.cpu_operator_cost + self.db.cpu_operator_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in*num_input_tuples_rel_out + cost_rel_out
-        total_cost = startup_cost + run_cost
+        overestimate_reason = """
+            The answer is overestimated due to the way Postgres handle a certain type of relation (e.g. unique inner relation), which they implemented a much more optimized way to handle the join. Thus its cost estimation function is different as well.
+        """
+
+        if rel_inner.node_type == 'Materialize' and rel_outer.node_type == 'Seq Scan':
+
+            run_cost = (self.db.cpu_operator_cost + self.db.cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in * num_blocks_rel_in + cost_rel_out    
+            total_cost = startup_cost + run_cost
+            description = f"""
+                startup_cost = {startup_cost}
+                The cost to retrieve the first row is zero
+
+                run_cost    = (cpu_operator_cost + cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in * num_blocks_rel_in + cost_rel_out
+                            = ({self.db.cpu_operator_cost} + {self.db.cpu_tuple_cost}) * {num_input_tuples_rel_out} * {num_input_tuples_rel_in} + {cost_rel_in} * {num_blocks_rel_in} + {cost_rel_out}
+                            = {run_cost}
+                
+                total_cost  = startup_cost + run_cost
+                                = {total_cost}
+
+                Valid calculation? {"Yes" if self.valid else "No"}
+                {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
+            """
+        elif rel_inner.node_type == 'Index Scan' and rel_outer.node_type == 'Seq Scan':
+            startup_cost = rel_inner.startup_cost
+            run_cost = (self.db.cpu_tuple_cost + rel_inner.startup_cost) * num_input_tuples_rel_out + cost_rel_out
+
+            total_cost = startup_cost + run_cost
+
+            description = f"""
+                startup_cost = {startup_cost}
+
+                run_cost    = (cpu_tuple_cost + startup_cost) * num_input_tuples_rel_out + cost_rel_out
+                                = ({self.db.cpu_tuple_cost} + {rel_inner.startup_cost}) * {num_input_tuples_rel_out} + {cost_rel_out}
+                                = {run_cost}
+
+                total_cost  = startup_cost + run_cost
+
+                Valid calculation? {"Yes" if self.valid else "No"}
+                {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
+            """
+        else:
+            run_cost = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out) * self.db.seq_page_cost
+            total_cost = startup_cost + run_cost
+            description = f"""
+                Using the lecture's formula,
+                
+                run_cost    = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out) * seq_page_cost
+                                = ({num_blocks_rel_out} + {num_blocks_rel_in} * {num_input_tuples_rel_out}) * {self.db.seq_page_cost}
+                                = {run_cost}
+
+                Valid calculation? {"Yes" if self.valid else "No"}
+                {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
+            """ 
+
+        
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
         self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
-        description = f"""
-            startup_cost    = {startup_cost}
-            run_cost        = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
-
-            total_cost = startup_cost + run_cost = {total_cost}
-            PostgreSQL total_cost = {psql_total_cost}
-
-            Valid calculation? {"Yes" if self.valid else "No"}
-            {"" if self.valid else reason}
-        """
+        
         return description
 
     def get_materialize_description(self):
@@ -613,8 +636,8 @@ class Node:
         rel_s = self.children[0]
         rel_r = self.children[1]
 
-        b_s = math.ceil(rel_s.row_count / rel_s.row_width)
-        b_r = math.ceil(rel_r.row_count / rel_r.row_width)
+        b_s = math.ceil(rel_s.row_count * rel_s.row_width / self.db.block_size)
+        b_r = math.ceil(rel_r.row_count * rel_r.row_width / self.db.block_size)
 
         total_cost = 3 * (b_s + b_r) * self.db.seq_page_cost
 
