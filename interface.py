@@ -67,7 +67,7 @@ class QueryExplanation(ttk.Frame):
             self.selected_node = node
             self.query_explanation.config(text=node.cost_description)
 
-        curnode = self.query_selection_tree.insert(parent, "end", text=node.node_type, values=(node.total_cost, node.row_count), tags=(node.node_type, node.uuid))
+        curnode = self.query_selection_tree.insert(parent, "end", text=node.node_type, values=(node.startup_cost, node.total_cost, node.row_count), tags=(node.node_type, node.uuid))
         self.query_selection_tree.tag_bind(node.uuid, "<<TreeviewSelect>>", callback=callback)
         for child in node.children:
             self.__recursive_update(child, curnode)
@@ -94,10 +94,11 @@ class QueryExplanation(ttk.Frame):
         self.query_selection_frame = ttk.Frame(self, width=5)
         self.query_selection_frame.pack(side = ttk.LEFT, fill="y", padx=(0, 16))
 
-        self.query_selection_tree = ttk.Treeview(self.query_selection_frame, columns=("cost", "rows"), height=50)
+        self.query_selection_tree = ttk.Treeview(self.query_selection_frame, columns=("startup", "cost", "rows"), height=50)
         self.query_selection_tree.heading("#0", text="Query Plan")
-        self.query_selection_tree.heading("#1", text="Cost")
-        self.query_selection_tree.heading("#2", text="Rows")
+        self.query_selection_tree.heading("#1", text="Startup Cost")
+        self.query_selection_tree.heading("#2", text="Total Cost")
+        self.query_selection_tree.heading("#3", text="Rows")
         
         # Onclick event (based on tags)
         self.query_selection_tree.pack(side = ttk.LEFT, fill="y")
@@ -360,7 +361,7 @@ class LayoutContent(ttk.Frame):
     def refresh_query_content(self):
         # To be used after a new query
         image = Image.open('./qep.png')
-        image = image.resize((480, 480))
+        image = image.resize((560, 560))
         self.graph_image = ImageTk.PhotoImage(image)
         self.graph_image_label.configure(image=self.graph_image)
         self.graph_image_label.image = self.graph_image
