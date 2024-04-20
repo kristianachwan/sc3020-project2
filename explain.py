@@ -696,14 +696,14 @@ class Node:
         description = f"""
             Total cost of Gather
             startup_cost = startup_cost + parallel_setup_cost
-                = {prev_startup_cost} + {parallel_setup_cost}
-                = {startup_cost}
+                        = {prev_startup_cost} + {parallel_setup_cost}
+                        = {startup_cost}
             run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * planned_row)
-                = ({prev_total_cost} - {prev_startup_cost}) + ({parallel_tuple_cost} * {planned_row})
-                = {run_cost}
+                     = ({prev_total_cost} - {prev_startup_cost}) + ({parallel_tuple_cost} * {planned_row})
+                     = {run_cost}
             total cost = (startup_cost) + (run_cost)
-                = ({startup_cost} + {run_cost})
-                = {total_cost}
+                       = ({startup_cost} + {run_cost})
+                       = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
             is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
             {"" if self.valid else reason}
