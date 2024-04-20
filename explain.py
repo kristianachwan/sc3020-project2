@@ -179,8 +179,6 @@ class DB:
             WHERE name = 'work_mem';
         """)[0][0][0])
 
-
-
 class Node: 
     def __init__(self, query_plan, db: DB, children, epsilon): 
         self.query_plan = query_plan
