@@ -378,7 +378,7 @@ class Node:
         startup_cost = 0
         run_cost = 2 * self.db.cpu_operator_cost * self.children[0].row_count
 
-        total_cost = (startup_cost * self.children[0].total_cost) + run_cost
+        total_cost = (startup_cost + self.children[0].total_cost) + run_cost
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
@@ -390,7 +390,7 @@ class Node:
             startup_cost = {startup_cost}
             run_cost = 2 * cpu_operator_cost * num_input_tuples
             run_cost = 2 * {self.db.cpu_operator_cost} * {self.children[0].row_count} = {run_cost}
-            total_cost = (startup_cost * total_cost_of_scan) + run_cost = {total_cost}
+            total_cost = (startup_cost + total_cost_of_scan) + run_cost = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
             Valid calculation? {"Yes" if valid else "No"}
             {"" if valid else reason}
