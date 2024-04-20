@@ -227,7 +227,12 @@ class Node:
 
     def get_label(self): 
         return f"""{self.node_type} {" - " + self.relation_name if self.relation_name else ""}\n{"cost: " + str(round(self.total_cost, 3))}"""
-    
+
+    def get_value_status(self, actual_value, calculated_value):
+        if calculated_value > actual_value: 
+            return "\nOur system overestimate the value. "
+        else: return "\nOur system underestimate the value. " 
+
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
             if self.filter: 
