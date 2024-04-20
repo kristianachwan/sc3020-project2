@@ -260,13 +260,13 @@ class Node:
         description = f"""
         startup_cost = {startup_cost} (the cost to retrieve the first row)
 
-        run_cost    = cpu_run_cost + disk_run_cost 
-                    = (cpu_tuple_cost) * Ntuple + seq_page_cost * Npage
-                    = ({cpu_tuple_cost}) * {row_count} + {seq_page_cost} * {page_count}
-                    = {run_cost}
+        run_cost = cpu_run_cost + disk_run_cost 
+                 = (cpu_tuple_cost) * Ntuple + seq_page_cost * Npage
+                 = ({cpu_tuple_cost}) * {row_count} + {seq_page_cost} * {page_count}
+                 = {run_cost}
         calculated_total_cost = startup_cost + run_cost 
-                                = {startup_cost} + {run_cost}
-                                = {total_cost}
+                              = {startup_cost} + {run_cost}
+                              = {total_cost}
 
         psql_total_cost = {self.total_cost}
                                 
@@ -295,12 +295,12 @@ class Node:
 
 
         run_cost = cpu_run_cost + disk_run_cost 
-                    = (cpu_tuple_cost + cpu_operator_cost) * Ntuple + seq_page_cost * Npage
-                    = ({cpu_tuple_cost + cpu_operator_cost}) * {row_count} + {seq_page_cost} * {page_count}
-                    = {run_cost}
+                 = (cpu_tuple_cost + cpu_operator_cost) * Ntuple + seq_page_cost * Npage
+                 = ({cpu_tuple_cost + cpu_operator_cost}) * {row_count} + {seq_page_cost} * {page_count}
+                 = {run_cost}
         calculated_total_cost = startup_cost + run_cost 
-                                = {startup_cost} + {run_cost}
-                                = {total_cost}
+                              = {startup_cost} + {run_cost}
+                              = {total_cost}
 
         psql_total_cost = {self.total_cost}
 
@@ -419,12 +419,12 @@ class Node:
                 startup_cost = {startup_cost}
                 The cost to retrieve the first row is zero
 
-                run_cost    = (cpu_operator_cost + cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in * num_blocks_rel_in + cost_rel_out
-                            = ({self.db.cpu_operator_cost} + {self.db.cpu_tuple_cost}) * {num_input_tuples_rel_out} * {num_input_tuples_rel_in} + {cost_rel_in} * {num_blocks_rel_in} + {cost_rel_out}
-                            = {run_cost}
+                run_cost = (cpu_operator_cost + cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in * num_blocks_rel_in + cost_rel_out
+                         = ({self.db.cpu_operator_cost} + {self.db.cpu_tuple_cost}) * {num_input_tuples_rel_out} * {num_input_tuples_rel_in} + {cost_rel_in} * {num_blocks_rel_in} + {cost_rel_out}
+                         = {run_cost}
                 
                 total_cost  = startup_cost + run_cost
-                                = {total_cost}
+                            = {total_cost}
 
                 Valid calculation? {"Yes" if self.valid else "No"}
                 {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
@@ -438,9 +438,9 @@ class Node:
             description = f"""
                 startup_cost = {startup_cost}
 
-                run_cost    = (cpu_tuple_cost + startup_cost) * num_input_tuples_rel_out + cost_rel_out
-                                = ({self.db.cpu_tuple_cost} + {rel_inner.startup_cost}) * {num_input_tuples_rel_out} + {cost_rel_out}
-                                = {run_cost}
+                run_cost = (cpu_tuple_cost + startup_cost) * num_input_tuples_rel_out + cost_rel_out
+                         = ({self.db.cpu_tuple_cost} + {rel_inner.startup_cost}) * {num_input_tuples_rel_out} + {cost_rel_out}
+                         = {run_cost}
 
                 total_cost  = startup_cost + run_cost
 
@@ -453,9 +453,9 @@ class Node:
             description = f"""
                 Using the lecture's formula,
                 
-                run_cost    = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out) * seq_page_cost
-                                = ({num_blocks_rel_out} + {num_blocks_rel_in} * {num_input_tuples_rel_out}) * {self.db.seq_page_cost}
-                                = {run_cost}
+                run_cost = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out) * seq_page_cost
+                         = ({num_blocks_rel_out} + {num_blocks_rel_in} * {num_input_tuples_rel_out}) * {self.db.seq_page_cost}
+                         = {run_cost}
 
                 Valid calculation? {"Yes" if self.valid else "No"}
                 {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
@@ -501,18 +501,18 @@ class Node:
             extra_run_cost  = seq_page_cost * ceil(tuples_size / block_size)
             extra_run_cost  = {self.db.seq_page_cost} * ceil({tuples_size} / {self.db.block_size}) = {self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size)}
 
-            run_cost    += extra_run_cost
-            run_cost    = {run_cost} + {extra_run_cost} 
-                        = {run_cost + extra_run_cost}
+            run_cost += extra_run_cost
+            run_cost = {run_cost} + {extra_run_cost} 
+                     = {run_cost + extra_run_cost}
         """
 
         description = f"""
             startup_cost = input_startup_cost
                          = {startup_cost}
                             
-            run_cost    = input_run_cost +  2 * cpu_operator_cost * num_input_tuples
-            run_cost    = {self.children[0].total_cost - self.children[0].startup_cost} + 2 * {self.db.cpu_operator_cost} * {self.children[0].row_count} 
-                        = {run_cost}
+            run_cost = input_run_cost +  2 * cpu_operator_cost * num_input_tuples
+            run_cost = {self.children[0].total_cost - self.children[0].startup_cost} + 2 * {self.db.cpu_operator_cost} * {self.children[0].row_count} 
+                     = {run_cost}
 
             { extra_description if write_to_disk else "" }
 
@@ -532,8 +532,8 @@ class Node:
         avg cost = height of index + data blocks/2 + total blocks/2
 
         assumptions:
-            - branching factor  = number of tuples in a block
-                                = reltuple / relpages
+            - branching factor = number of tuples in a block
+                               = reltuple / relpages
             - height = log(relpages) / log(branching factor)
             - data blocks = number of tuples / number of tuples in a block * 0.5
 
@@ -568,25 +568,25 @@ class Node:
             - The index is a B+ tree index
             - The given index is clustered index
 
-            branching_factor    = num_index_tuples / num_index_pages
-                                = {num_index_tuples} / {num_index_pages}
-                                = {num_index_tuples / num_index_pages} (number of branch = number of tuples in a block)
+            branching_factor = num_index_tuples / num_index_pages
+                             = {num_index_tuples} / {num_index_pages}
+                             = {num_index_tuples / num_index_pages} (number of branch = number of tuples in a block)
 
-            height_of_index     = log(num_index_pages) / log(branching_factor)
-                                    = log({num_index_pages}) / log({branching_factor})
-                                    = {math.log(num_index_pages) / math.log(branching_factor)}
+            height_of_index = log(num_index_pages) / log(branching_factor)
+                            = log({num_index_pages}) / log({branching_factor})
+                            = {math.log(num_index_pages) / math.log(branching_factor)}
 
-            avg_data_blocks     = row_count / branching_factor * 0.5
-                                    = {row_count} / {branching_factor} * 0.5
-                                    = {row_count / branching_factor * 0.5}
+            avg_data_blocks = row_count / branching_factor * 0.5
+                            = {row_count} / {branching_factor} * 0.5
+                            = {row_count / branching_factor * 0.5}
 
-            avg_cost            = (height_of_index + avg_data_blocks + rel_pages / 2) * random_page_cost
-                                    = {height_of_index} + {row_count / branching_factor * 0.5} + {self.db.get_table_page_count(self.relation_name) / 2} * {self.db.random_page_cost}
-                                    = {avg_cost}
+            avg_cost = (height_of_index + avg_data_blocks + rel_pages / 2) * random_page_cost
+                     = {height_of_index} + {row_count / branching_factor * 0.5} + {self.db.get_table_page_count(self.relation_name) / 2} * {self.db.random_page_cost}
+                     = {avg_cost}
 
                                 
-            total_cost              = {avg_cost}
-            PostgreSQL total_cost   = {psql_total_cost}
+            total_cost = {avg_cost}
+            PostgreSQL total_cost = {psql_total_cost}
 
             Valid calculation? {"Yes" if self.valid else "No"}
             {"" if self.valid else reason}
@@ -627,7 +627,7 @@ class Node:
         description = f"""
             As observed in PostgresSQL, hash cost are passed hence we will do the same.
             total_cost = prev_total_cost
-                = {total_cost}
+                       = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
             is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
             {"" if self.valid else reason}
@@ -662,17 +662,17 @@ class Node:
                 - Negligible block header
 
             Using grace hash join algorithm taught in the lecture 3(num_blocks_S + num_blocks_R)
-            num_blocks_S    = ceil(row_count_S / row_width_S)
-                                = ceil({rel_s.row_count} / {rel_s.row_width})
-                                = {b_s}
+            num_blocks_S = ceil(row_count_S / row_width_S)
+                         = ceil({rel_s.row_count} / {rel_s.row_width})
+                         = {b_s}
             
-            num_blocks_R    = row_count_R / row_width_R
-                                = ceil({rel_r.row_count} / {rel_r.row_width})
-                                = {b_r}
+            num_blocks_R = row_count_R / row_width_R
+                         = ceil({rel_r.row_count} / {rel_r.row_width})
+                         = {b_r}
             
-            total_cost      = 3 * (num_blocks_S + num_blocks_R) * seq_page_cost
-                                = 3 * ({b_s} + {b_r}) * {self.db.seq_page_cost}
-                                = {total_cost}
+            total_cost = 3 * (num_blocks_S + num_blocks_R) * seq_page_cost
+                       = 3 * ({b_s} + {b_r}) * {self.db.seq_page_cost}
+                       = {total_cost}
 
             Is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
             {"" if self.valid else reason}
@@ -695,13 +695,13 @@ class Node:
 
         description = f"""
             Total cost of Gather
-             startup_cost = startup_cost + parallel_setup_cost
+            startup_cost = startup_cost + parallel_setup_cost
                 = {prev_startup_cost} + {parallel_setup_cost}
                 = {startup_cost}
-             run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * planned_row)
+            run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * planned_row)
                 = ({prev_total_cost} - {prev_startup_cost}) + ({parallel_tuple_cost} * {planned_row})
                 = {run_cost}
-             total cost = (startup_cost) + (run_cost)
+            total cost = (startup_cost) + (run_cost)
                 = ({startup_cost} + {run_cost})
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
@@ -731,19 +731,19 @@ class Node:
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
-             n = workers + 1
+            n = workers + 1
                 = {workers} + 1
                 = {n}
-             comparison_cost = 2.0 * cpu_operator_cost
+            comparison_cost = 2.0 * cpu_operator_cost
                 = 2.0 * {cpu_operator_cost}
                 = {comparison_cost}
-             startup_cost = (comparison_cost * n * logN) + parallel_setup_cost + prev_startup_cost
+            startup_cost = (comparison_cost * n * logN) + parallel_setup_cost + prev_startup_cost
                 = ({comparison_cost} * {n} * {logN}) + {parallel_setup_cost + prev_startup_cost}
                 = {startup_cost}
-             run_cost = (planned_row * comparison_cost * logN) + (cpu_operator_cost * planned_row) + (parallel_tuple_cost * planned_row * 1.05)
+            run_cost = (planned_row * comparison_cost * logN) + (cpu_operator_cost * planned_row) + (parallel_tuple_cost * planned_row * 1.05)
                 = ({planned_row} * {comparison_cost} * {logN}) + ({cpu_operator_cost} * {planned_row}) + ({parallel_tuple_cost} * {planned_row} * 1.05)
                 = {run_cost}
-             total cost = (startup_cost) + (run_cost)
+            total cost = (startup_cost) + (run_cost)
                 = {startup_cost} + {run_cost}
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
