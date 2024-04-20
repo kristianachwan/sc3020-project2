@@ -411,15 +411,18 @@ class Node:
 
         if rel_inner.node_type == 'Materialize' and rel_outer.node_type == 'Seq Scan':
 
-            run_cost = (self.db.cpu_operator_cost + self.db.cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in * num_blocks_rel_in + cost_rel_out    
+            rescan_cost =  self.db.cpu_operator_cost * size_tuple_rel_in
+
+            run_cost = (self.db.cpu_operator_cost + self.db.cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + rescan_cost * (size_tuple_rel_out - 1) + cost_rel_out    
             total_cost = startup_cost + run_cost
+           
             description = f"""
                 startup_cost = {startup_cost}
                 The cost to retrieve the first row is zero
 
-                run_cost = (cpu_operator_cost + cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + cost_rel_in * num_blocks_rel_in + cost_rel_out
-                         = ({self.db.cpu_operator_cost} + {self.db.cpu_tuple_cost}) * {num_input_tuples_rel_out} * {num_input_tuples_rel_in} + {cost_rel_in} * {num_blocks_rel_in} + {cost_rel_out}
-                         = {run_cost}
+                run_cost = (cpu_operator_cost + cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + rescan_cost * (size_tuple_rel_out - 1) + cost_rel_out
+                            = ({self.db.cpu_operator_cost} + {self.db.cpu_tuple_cost}) * {num_input_tuples_rel_out} * {num_input_tuples_rel_in} + {rescan_cost} * ({size_tuple_rel_out} - 1) + {cost_rel_out}
+                            = {run_cost}
                 
                 total_cost  = startup_cost + run_cost
                             = {total_cost}
