@@ -417,10 +417,12 @@ class Node:
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
-            startup_cost = {startup_cost}
-            run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
+            startup_cost    = {startup_cost}
+            run_cost        = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
+
             total_cost = startup_cost + run_cost = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
+
             Valid calculation? {"Yes" if self.valid else "No"}
             {"" if self.valid else reason}
         """
@@ -465,10 +467,12 @@ class Node:
             startup_cost = input_startup_cost
                          = {startup_cost}
                             
-            run_cost = input_run_cost +  2 * cpu_operator_cost * num_input_tuples
-            run_cost = {self.children[0].total_cost - self.children[0].startup_cost} + 2 * {self.db.cpu_operator_cost} * {self.children[0].row_count} = {run_cost}
+            run_cost    = input_run_cost +  2 * cpu_operator_cost * num_input_tuples
+            run_cost    = {self.children[0].total_cost - self.children[0].startup_cost} + 2 * {self.db.cpu_operator_cost} * {self.children[0].row_count} 
+                        = {run_cost}
 
             { extra_description if write_to_disk else "" }
+
             total_cost = start_up_cost + run_cost = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
 
@@ -477,50 +481,73 @@ class Node:
         """
         return description
 
-    # unfinished
+    # ESTIMATED
     def get_index_scan_description(self):
+        """
+        Using the lecture formula:
+
+        avg cost = height of index + data blocks/2 + total blocks/2
+
+        assumptions:
+            - branching factor  = number of tuples in a block
+                                = reltuple / relpages
+            - height = log(relpages) / log(branching factor)
+            - data blocks = number of tuples / number of tuples in a block * 0.5
+
+
+        """
+
         index_relation_name = self.query_plan['Index Name']
         index_statistics = self.db.get_table_statistics(index_relation_name, ['reltuples', 'relpages'])
         num_index_pages, num_index_tuples = index_statistics['relpages'], index_statistics['reltuples']
 
-        # placeholder value
-        index_tree_height = 1
-        startup_cost = (math.ceil(math.log2(num_index_tuples)) + (index_tree_height + 1)*50) * self.db.cpu_operator_cost
-        page_count = self.db.get_table_page_count(self.relation_name)
-        seq_page_cost = self.db.seq_page_cost
+        row_count = self.db.get_table_row_count(self.relation_name)
 
-        # placeholder value
-        selectivity = 0.00001
-        cpu_operator_cost = self.db.cpu_operator_cost 
+        branching_factor = num_index_tuples / num_index_pages
 
-        # placeholder value
-        index_correlation = 1
-        max_io_cost =  page_count * self.db.random_page_cost
-        min_io_cost = self.db.random_page_cost + (math.ceil(selectivity * page_count)-1) * seq_page_cost
-        cpu_index_tuple_cost = self.db.cpu_index_tuple_cost
+        height_of_index = math.log(num_index_pages) / math.log(branching_factor)
 
-        index_cpu_cost = selectivity * num_index_tuples * (cpu_index_tuple_cost + cpu_operator_cost)
-        table_cpu_cost = selectivity * self.db.get_table_row_count(self.relation_name) * self.db.cpu_tuple_cost
-        index_io_cost = math.ceil(selectivity * num_index_pages) * self.db.random_page_cost
-        table_io_cost = max_io_cost + index_correlation ** 2 * (min_io_cost - max_io_cost)
+        avg_data_blocks = row_count / branching_factor * 0.5
 
-        run_cost = (index_cpu_cost + table_cpu_cost) + (index_io_cost + table_io_cost)
-
-        total_cost = startup_cost + run_cost
+        avg_cost = (height_of_index + avg_data_blocks + row_count / 2) * self.db.random_page_cost
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - psql_total_cost) <= self.epsilon
-        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+        valid = abs(avg_cost - psql_total_cost) <= self.epsilon
+        reason = f"""
+            The calculation from the EXPLAIN query differs from our calculation due to the limited information provided by the database interface.
+            PostgreSQL uses data from histograms and statistics to estimate the selectivity, which the data is not available through SQL query and beyond our lecture scope.
+            Thus, it is impossible to obtain the exact cost of the index scan operation using the SQL query alone.
+            """
 
         description = f"""
-            startup_cost = {startup_cost}
-            run_cost = {index_cpu_cost} + {table_cpu_cost} + {index_io_cost} + {table_io_cost} = {run_cost}
-            total_cost = index_cpu_cost + table_cpu_cost + index_io_cost + table_io_cost = {total_cost}
-            PostgreSQL total_cost = {psql_total_cost}
-            Valid calculation? {"Yes" if valid else "No"}
+            As there are various types of indexes in PostgreSQL, there will be several assumptions being made:
+            - The index is a B+ tree index
+            - The given index is clustered index
+
+            branching_factor    = num_index_tuples / num_index_pages
+                                = {num_index_tuples} / {num_index_pages}
+                                = {num_index_tuples / num_index_pages} (number of branch = number of tuples in a block)
+
+            height_of_index     = log(num_index_pages) / log(branching_factor)
+                                = log({num_index_pages}) / log({branching_factor})
+                                = {math.log(num_index_pages) / math.log(branching_factor)}
+
+            avg_data_blocks     = row_count / branching_factor * 0.5
+                                = {row_count} / {branching_factor} * 0.5
+                                = {row_count / branching_factor * 0.5}
+
+            avg_cost            = (height_of_index + avg_data_blocks + row_count / 2) * random_page_cost
+                                = {height_of_index} + {row_count / branching_factor * 0.5} + {row_count / 2} * {self.db.random_page_cost}
+                                = {avg_cost}
+
+                                
+            total_cost              = {avg_cost}
+            PostgreSQL total_cost   = {psql_total_cost}
+
+            Valid calculation? {"Yes" if self.valid else "No"}
             {"" if valid else reason}
-        """
+            """
         return description
     
     def get_cost_description_aggregate(self): 
@@ -538,12 +565,12 @@ class Node:
                 = {total_cost}
         """
 
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         description = f"""
             {formula}
             PostgreSQL total_cost = {psql_total_cost}
-                is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-                {"" if valid else reason}
+                is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+                {"" if self.valid else reason}
         """
         return description
 
@@ -551,7 +578,7 @@ class Node:
     def get_cost_description_hash(self): 
         total_cost = self.children[0].total_cost
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -559,8 +586,8 @@ class Node:
             total_cost = prev_total_cost
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
     
