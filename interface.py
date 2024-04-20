@@ -265,7 +265,7 @@ class SQLInput(ttk.Frame):
         self.execute_button.bind("<Button-1>", self.__execute_query)
 
         
-        self.epsilon_input = Input(self, placeholder="Epsilon", default_value="0.05")
+        self.epsilon_input = Input(self, placeholder="Epsilon", default_value="1")
         self.epsilon_input.pack(side = ttk.RIGHT, pady=4, padx = 8)
         self.epsilon_label = ttk.Label(self, text="Epsilon", anchor=ttk.W)
         self.epsilon_label.pack(side = ttk.RIGHT, pady=4, padx = 8)
