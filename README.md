@@ -17,6 +17,8 @@ $$ $$\$$ |$$ |  $$ |$$ |      $$ |      $$  /\$$\
 
 **QUery Plan EXplanation**
 
+QUPEX aims to explain the derived cost from PostgreSQL `EXPLAIN` feature. This involves understanding the cost model of PostgreSQL internal working (refer to: [costsize.c](https://github.com/postgres/postgres/blob/master/src/backend/optimizer/path/costsize.c)) and database catalog. The explanation that we provide for the cost derivation is emphasizing on how the formula used and how/why certain parameters used. In the case we are unable to estimate correctly, we also do provide more explantions for better clarity.
+
 #### Team members:
 
 - Clayton Fernalo
@@ -38,7 +40,9 @@ pip install -r requirements.txt
 python project.py
 ```
 
-## Tech Stack
+## Technology Used
 
-- Python
-- [Tkinter](https://docs.python.org/3/library/tkinter.html) GUI
+- Language: Python
+- GUI Framework: [ttkbootstrap](https://ttkbootstrap.readthedocs.io/en/latest/)
+- DB adaptor: [psycopg2](https://pypi.org/project/psycopg2/)
+- Visualization: [graphviz](https://pypi.org/project/graphviz/)
