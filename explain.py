@@ -254,8 +254,11 @@ class Node:
             return self.get_index_scan_description()
         elif self.node_type == 'Materialize':
             return self.get_materialize_description()
+        elif self.node_type == 'Nested Loop':
+            return self.get_nested_loop_join_description()
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
+    # Lecture + PostgreSQL documentation
     def get_cost_description_sequential_scan(self): 
         cpu_tuple_cost = self.db.cpu_tuple_cost
         row_count = self.db.get_table_row_count(self.relation_name)
@@ -265,7 +268,7 @@ class Node:
         run_cost = (cpu_tuple_cost) * row_count + seq_page_cost * page_count
         total_cost = startup_cost + run_cost 
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
-        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+        reason = "The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
         startup_cost = {startup_cost} (the cost to retrieve the first row)
@@ -286,6 +289,7 @@ class Node:
 
         return description
     
+    # Not covered in lecture
     def get_cost_description_sequential_scan_with_filter(self): 
         cpu_tuple_cost = self.db.cpu_tuple_cost
         cpu_operator_cost = self.db.cpu_operator_cost
@@ -297,7 +301,7 @@ class Node:
         total_cost = startup_cost + run_cost 
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
 
-        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+        reason = "The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
         startup_cost = {startup_cost} (the cost to retrieve the first row)
@@ -401,6 +405,14 @@ class Node:
         # fetch number of tuples from the can of rel_out and rel_in
         num_input_tuples_rel_out = rel_outer.row_count
         num_input_tuples_rel_in = rel_inner.row_count
+
+        # fetch size of tuples from the can of rel_out and rel_in
+        size_tuple_rel_out = rel_outer.row_width
+        size_tuple_rel_in = rel_inner.row_width
+
+        # calculate the number of blocks for each relation
+        num_blocks_rel_out = math.ceil(size_tuple_rel_out / self.db.block_size)
+        num_blocks_rel_in = math.ceil(size_tuple_rel_in / self.db.block_size)
 
         # fetch number of tuples from the can of rel_out and rel_in
         cost_rel_out = rel_outer.total_cost
@@ -516,7 +528,7 @@ class Node:
         valid = abs(avg_cost - psql_total_cost) <= self.epsilon
         reason = f"""
             The calculation from the EXPLAIN query differs from our calculation due to the limited information provided by the database interface.
-            PostgreSQL uses data from histograms and statistics to estimate the selectivity, which the data is not available through SQL query and beyond our lecture scope.
+            PostgreSQL uses data from histograms and statistics to estimate the selectivity, which the data is not available through SQL query.
             Thus, it is impossible to obtain the exact cost of the index scan operation using the SQL query alone.
             """
 
@@ -591,27 +603,50 @@ class Node:
         """
         return description
     
+    # Estimation
     def get_cost_description_hash_join(self):
-        conditions = self.hash_condition
-        tables = ["region", "nation", "supplier", "part", "partsupp", "customer", "orders", "lineitem"]
-        pattern = r"\b(?:" + "|".join(re.escape(word) for word in tables) + r")\b"
-        matches = re.findall(pattern, conditions)
-        rel_r = self.db.tables_block[matches[0]]
-        rel_s = self.db.tables_block[matches[1]]
-        total_cost = 3 * (rel_r + rel_s)
-        psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
-        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+        """
+        - Using grace hash join algorithm 3(B(S) + B(R))
+        - B(S) = number of blocks in the smaller relation
+        - B(R) = number of blocks in the larger relation
+        """
+        rel_s = self.children[0]
+        rel_r = self.children[1]
+
+        b_s = math.ceil(rel_s.row_count / rel_s.row_width)
+        b_r = math.ceil(rel_r.row_count / rel_r.row_width)
+
+        total_cost = 3 * (b_s + b_r) * self.db.seq_page_cost
+
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
+
+        reason = f"""
+            The calculation done by PostgreSQL is different from ours due to the hash join can be done in multiple batches, it incorporates statistics (for example most common values) - which is not obtainable via SQL query. It also uses a different cost model (hash_qual_cost and qp_qual_cost) to estimate the cost, which causes our estimate to be far below than PostgreSQL's.
+        """
 
         description = f"""
-            Since Postgres Hash Join is very complex we will be following the formula of Grace Hash Join taught in lecture instead
-            total_cost = 3(B(R) + B(S))
-                = 3 ({rel_r} + {rel_s})
-                = {total_cost}
-            PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            Assumptions:
+                - The hash join function cost is using grace hash join algorithm
+                - The smaller hash partition fits in memory
+                - Negligible block header
+
+            Using grace hash join algorithm taught in the lecture 3(num_blocks_S + num_blocks_R)
+            num_blocks_S    = ceil(row_count_S / row_width_S)
+                                = ceil({rel_s.row_count} / {rel_s.row_width})
+                                = {b_s}
+            
+            num_blocks_R    = row_count_R / row_width_R
+                                = ceil({rel_r.row_count} / {rel_r.row_width})
+                                = {b_r}
+            
+            total_cost      = 3 * (num_blocks_S + num_blocks_R) * seq_page_cost
+                                = 3 * ({b_s} + {b_r}) * {self.db.seq_page_cost}
+                                = {total_cost}
+
+            Is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
+
         return description
     
     def get_cost_description_gather(self): 
