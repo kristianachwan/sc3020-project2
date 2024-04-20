@@ -679,7 +679,7 @@ class GraphVisualizer:
         self.graphviz = graphviz.Digraph('G', filename='qep', format='png')
         self.graphviz.attr(rankdir='BT')
         self.parse_graph(graph.root)
-        self.graphviz.render('qep')
+        self.graphviz.render('assets/img/qep')
 
     def parse_graph(self, node: Node):
         if not node.valid: 

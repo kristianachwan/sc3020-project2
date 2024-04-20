@@ -360,7 +360,7 @@ class LayoutContentNotLoggedIn(ttk.LabelFrame):
 class LayoutContent(ttk.Frame):
     def refresh_query_content(self):
         # To be used after a new query
-        image = Image.open('./qep.png')
+        image = Image.open('./assets/img/qep.png')
         image = image.resize((560, 560))
         self.graph_image = ImageTk.PhotoImage(image)
         self.graph_image_label.configure(image=self.graph_image)
