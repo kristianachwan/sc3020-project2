@@ -513,7 +513,7 @@ class Node:
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        valid = abs(avg_cost - psql_total_cost) <= self.epsilon
+        self.valid = abs(avg_cost - psql_total_cost) <= self.epsilon
         reason = f"""
             The calculation from the EXPLAIN query differs from our calculation due to the limited information provided by the database interface.
             PostgreSQL uses data from histograms and statistics to estimate the selectivity, which the data is not available through SQL query and beyond our lecture scope.
@@ -546,7 +546,7 @@ class Node:
             PostgreSQL total_cost   = {psql_total_cost}
 
             Valid calculation? {"Yes" if self.valid else "No"}
-            {"" if valid else reason}
+            {"" if self.valid else reason}
             """
         return description
     
@@ -600,7 +600,7 @@ class Node:
         rel_s = self.db.tables_block[matches[1]]
         total_cost = 3 * (rel_r + rel_s)
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -609,8 +609,8 @@ class Node:
                 = 3 ({rel_r} + {rel_s})
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
     
@@ -624,7 +624,7 @@ class Node:
         run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * self.row_count)
         total_cost = startup_cost + run_cost
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -639,8 +639,8 @@ class Node:
                 = ({startup_cost} + {run_cost})
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
     
@@ -661,7 +661,7 @@ class Node:
 
         total_cost = startup_cost + run_cost
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -681,8 +681,8 @@ class Node:
                 = {startup_cost} + {run_cost}
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
     
