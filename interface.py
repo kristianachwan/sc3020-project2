@@ -111,7 +111,7 @@ class QueryExplanation(ttk.Frame):
 
         explanation = "Click on the table to the left to see the explanation of the query plan."
 
-        self.query_explanation = ttk.ScrolledText(self.query_explanation_frame)
+        self.query_explanation = ttk.ScrolledText(self.query_explanation_frame, wrap="word")
         self.query_explanation.pack(side = ttk.LEFT, fill="y")
         self.query_explanation.insert(tk.INSERT, explanation)
         self.query_explanation.config(state=tk.DISABLED)
