@@ -485,11 +485,11 @@ class Node:
                 = {total_cost}
         """
 
-        valid = abs(total_cost - self.total_cost) <= epsilon
+        valid = abs(total_cost - self.total_cost) <= self.epsilon
         description = f"""
             {formula}
             PostgreSQL total_cost = {psql_total_cost}
-                is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+                is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
                 {"" if valid else reason}
         """
         return description
@@ -498,7 +498,7 @@ class Node:
     def get_cost_description_hash(self): 
         total_cost = self.children[0].total_cost
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= epsilon
+        valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -506,7 +506,7 @@ class Node:
             total_cost = prev_total_cost
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
             {"" if valid else reason}
         """
         return description
@@ -520,7 +520,7 @@ class Node:
         rel_s = self.db.tables_block[matches[1]]
         total_cost = 3 * (rel_r + rel_s)
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= epsilon
+        valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -529,7 +529,7 @@ class Node:
                 = 3 ({rel_r} + {rel_s})
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
             {"" if valid else reason}
         """
         return description
@@ -544,7 +544,7 @@ class Node:
         run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * self.row_count)
         total_cost = startup_cost + run_cost
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= epsilon
+        valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -559,7 +559,7 @@ class Node:
                 = ({startup_cost} + {run_cost})
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
             {"" if valid else reason}
         """
         return description
@@ -581,7 +581,7 @@ class Node:
 
         total_cost = startup_cost + run_cost
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= epsilon
+        valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -601,7 +601,7 @@ class Node:
                 = {startup_cost} + {run_cost}
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {epsilon})
+            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
             {"" if valid else reason}
         """
         return description
