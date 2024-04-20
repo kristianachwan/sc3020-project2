@@ -360,7 +360,7 @@ class LayoutContentNotLoggedIn(ttk.LabelFrame):
 class LayoutContent(ttk.Frame):
     def refresh_query_content(self):
         # To be used after a new query
-        image = Image.open('./qep.png')
+        image = Image.open('./assets/img/qep.png')
         image = image.resize((560, 560))
         self.graph_image = ImageTk.PhotoImage(image)
         self.graph_image_label.configure(image=self.graph_image)
@@ -435,9 +435,9 @@ class App(ttk.Window):
         super().__init__(self, themename="darkly")
 
         self.title("QUPEX - Query Plan Explorer")
-        self.iconbitmap("icon.ico")
+        self.iconbitmap("assets/img/icon.ico")
         self.icon_photo = ImageTk.PhotoImage(
-            Image.open('icon.ico')
+            Image.open('assets/img/icon.ico')
         )
         self.iconphoto(True, self.icon_photo)
         self.geometry("1280x900")
