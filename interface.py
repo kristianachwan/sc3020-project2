@@ -435,9 +435,9 @@ class App(ttk.Window):
         super().__init__(self, themename="darkly")
 
         self.title("QUPEX - Query Plan Explorer")
-        self.iconbitmap("icon.ico")
+        self.iconbitmap("assets/img/icon.ico")
         self.icon_photo = ImageTk.PhotoImage(
-            Image.open('icon.ico')
+            Image.open('assets/img/icon.ico')
         )
         self.iconphoto(True, self.icon_photo)
         self.geometry("1280x900")

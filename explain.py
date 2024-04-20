@@ -253,7 +253,7 @@ class Node:
         elif self.node_type == 'Index Scan': 
             return self.get_index_scan_description()
         elif self.node_type == 'Materialize':
-            return self.get_materialise_description()
+            return self.get_materialize_description()
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
     def get_cost_description_sequential_scan(self): 
@@ -426,7 +426,7 @@ class Node:
         """
         return description
 
-    def get_materialise_description(self):
+    def get_materialize_description(self):
         startup_cost = self.children[0].startup_cost
         run_cost = self.children[0].total_cost - self.children[0].startup_cost + 2 * self.db.cpu_operator_cost * self.children[0].row_count
 
