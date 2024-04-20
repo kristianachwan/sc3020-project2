@@ -246,7 +246,14 @@ class Node:
         run_cost = (cpu_tuple_cost) * row_count + seq_page_cost * page_count
         total_cost = startup_cost + run_cost 
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
-        reason = "The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+
+        underestimate_reason = """
+            The answer is underestimate due to the lack of information to the details needed to calculatae the intricate costs in Postgres.
+        """
+
+        overestimate_reason = """
+            The answer is overestimated due to Postgres implementing parallel scan, which is not considered in our calculation and not accounted in the lecture formula.
+        """
 
         description = f"""
         startup_cost = {startup_cost} (the cost to retrieve the first row)
@@ -262,7 +269,7 @@ class Node:
         psql_total_cost = {self.total_cost}
                                 
         Is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
-        {"" if self.valid else reason}
+        {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
         """
 
         return description
