@@ -218,6 +218,8 @@ class Node:
             return self.get_cost_description_sequential_scan() 
         elif self.node_type == 'Sort':
             return self.get_sort_cost_description()
+        elif self.node_type == 'Merge Join':
+            return self.get_sort_merge_join_description()
         elif self.node_type == 'Hash':
             return self.get_cost_description_hash() 
         elif self.node_type == 'Aggregate':
@@ -354,7 +356,6 @@ class Node:
             rel_inner = self.children[0]
             rel_outer = self.children[1]
 
-        # need to define a function to fetch number of tuples from the can of rel_out and rel_in
         num_input_tuples_rel_out = rel_outer.row_count
         num_input_tuples_rel_in = rel_inner.row_count
 
@@ -555,7 +556,7 @@ class Node:
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        valid = abs(avg_cost - psql_total_cost) <= self.epsilon
+        self.valid = abs(avg_cost - psql_total_cost) <= self.epsilon
         reason = f"""
             The calculation from the EXPLAIN query differs from our calculation due to the limited information provided by the database interface.
             PostgreSQL uses data from histograms and statistics to estimate the selectivity, which the data is not available through SQL query.
@@ -588,7 +589,7 @@ class Node:
             PostgreSQL total_cost   = {psql_total_cost}
 
             Valid calculation? {"Yes" if self.valid else "No"}
-            {"" if valid else reason}
+            {"" if self.valid else reason}
             """
         return description
     
@@ -689,7 +690,7 @@ class Node:
         run_cost = (prev_total_cost - prev_startup_cost) + (parallel_tuple_cost * self.row_count)
         total_cost = startup_cost + run_cost
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -704,8 +705,8 @@ class Node:
                 = ({startup_cost} + {run_cost})
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
     
@@ -726,7 +727,7 @@ class Node:
 
         total_cost = startup_cost + run_cost
         psql_total_cost = self.total_cost  
-        valid = abs(total_cost - self.total_cost) <= self.epsilon
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -746,8 +747,8 @@ class Node:
                 = {startup_cost} + {run_cost}
                 = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
-            is it a valid calculation? {"YES" if valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if valid else reason}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
     
