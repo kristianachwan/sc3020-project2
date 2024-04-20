@@ -24,6 +24,7 @@ class DB:
         self.parallel_tuple_cost = self.get_parallel_tuple_cost()
         self.statistics = self.get_statistics()
         self.tables_block = self.get_tables_block()
+        self.work_mem = self.get_work_mem()
 
         """ 
         Execute Analyze command if for all tables, the analyze or autoanalyze have never been done for each table. 
@@ -188,6 +189,17 @@ class DB:
             table_names[name] = num_blocks[0][0]
 
         return table_names
+    
+    def get_work_mem(self):
+        return int(self.execute("""
+            SELECT setting::bigint * CASE unit
+                WHEN 'kB' THEN 1024
+                WHEN 'MB' THEN 1024^2
+                ELSE 1
+                END AS work_mem_bytes
+            FROM pg_settings
+            WHERE name = 'work_mem';
+        """)[0][0][0])
 
 
 
@@ -201,6 +213,7 @@ class Node:
         self.acutal_row_count = query_plan['Actual Rows'] if 'Actual Rows' in query_plan else ""
         self.total_cost = query_plan['Total Cost']
         self.row_count = query_plan['Plan Rows']
+        self.row_width = query_plan['Plan Width']
         self.output = query_plan['Output'] if 'Output' in query_plan else ""
         self.filter = query_plan['Filter'] if 'Filter' in query_plan else ""
         self.relation_name = query_plan['Relation Name'] if 'Relation Name' in query_plan else ""
@@ -234,6 +247,8 @@ class Node:
             return self.get_cost_description_gather_merge() 
         elif self.node_type == 'Index Scan': 
             return self.get_index_scan_description()
+        elif self.node_type == 'Materialize':
+            return self.get_materialise_description()
         return 'Unfortunately, the portion of operation is beyond the scope of this project...'
     
     def get_cost_description_sequential_scan(self): 
@@ -248,19 +263,20 @@ class Node:
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
-            startup_cost = {startup_cost}
-            run_cost = cpu_run_cost + disk_run_cost 
-                     = (cpu_tuple_cost) * Ntuple + seq_page_cost * Npage
-                     = ({cpu_tuple_cost}) * {row_count} + {seq_page_cost} * {page_count}
-                     = {run_cost}
-            calculated_total_cost = startup_cost + run_cost 
-                                  = {startup_cost} + {run_cost}
-                                  = {total_cost}
+        startup_cost = {startup_cost} (the cost to retrieve the first row)
 
-            psql_total_cost = {self.total_cost}
-                                  
-            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if self.valid else reason}
+        run_cost    = cpu_run_cost + disk_run_cost 
+                    = (cpu_tuple_cost) * Ntuple + seq_page_cost * Npage
+                    = ({cpu_tuple_cost}) * {row_count} + {seq_page_cost} * {page_count}
+                    = {run_cost}
+        calculated_total_cost = startup_cost + run_cost 
+                                = {startup_cost} + {run_cost}
+                                = {total_cost}
+
+        psql_total_cost = {self.total_cost}
+                                
+        Is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+        {"" if self.valid else reason}
         """
 
         return description
@@ -278,19 +294,21 @@ class Node:
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
-            startup_cost = {startup_cost}
-            run_cost = cpu_run_cost + disk_run_cost 
-                     = (cpu_tuple_cost + cpu_operator_cost) * Ntuple + seq_page_cost * Npage
-                     = ({cpu_tuple_cost + cpu_operator_cost}) * {row_count} + {seq_page_cost} * {page_count}
-                     = {run_cost}
-            calculated_total_cost = startup_cost + run_cost 
-                                  = {startup_cost} + {run_cost}
-                                  = {total_cost}
+        startup_cost = {startup_cost} (the cost to retrieve the first row)
 
-            psql_total_cost = {self.total_cost}
 
-            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
-            {"" if self.valid else reason}
+        run_cost = cpu_run_cost + disk_run_cost 
+                    = (cpu_tuple_cost + cpu_operator_cost) * Ntuple + seq_page_cost * Npage
+                    = ({cpu_tuple_cost + cpu_operator_cost}) * {row_count} + {seq_page_cost} * {page_count}
+                    = {run_cost}
+        calculated_total_cost = startup_cost + run_cost 
+                                = {startup_cost} + {run_cost}
+                                = {total_cost}
+
+        psql_total_cost = {self.total_cost}
+
+        Is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+        {"" if self.valid else reason}
         """
         return description
     
@@ -318,12 +336,13 @@ class Node:
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
-            startup_cost = {startup_cost}
-            run_cost = {cpu_operator_cost} * {num_input_tuples} = {run_cost}
-            total_cost = startup_cost + run_cost = {total_cost}
-            PostgreSQL total_cost = {psql_total_cost}
-            Valid calculation? {"Yes" if self.valid else "No"}
-            {"" if self.valid else reason}
+        startup_cost = {startup_cost}
+
+        run_cost = {cpu_operator_cost} * {num_input_tuples} = {run_cost}
+        total_cost = startup_cost + run_cost = {total_cost}
+        PostgreSQL total_cost = {psql_total_cost}
+        Is this a valid calculation? {"Yes" if self.valid else "No"} (with epsilon = {self.epsilon})
+        {"" if self.valid else reason}
         """
         
         return description
@@ -355,12 +374,12 @@ class Node:
         reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
 
         description = f"""
-            startup_cost = {startup_cost}
-            run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
-            total_cost = startup_cost + run_cost = {total_cost}
-            PostgreSQL total_cost = {psql_total_cost}
-            Valid calculation? {"Yes" if self.alid else "No"}
-            {"" if self.valid else reason}
+        startup_cost = {startup_cost}
+        run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
+        total_cost = startup_cost + run_cost = {total_cost}
+        PostgreSQL total_cost = {psql_total_cost}
+        Valid calculation? {"Yes" if self.alid else "No"}
+        {"" if self.valid else reason}
         """
         return description
     
@@ -402,23 +421,45 @@ class Node:
         return description
 
     def get_materialise_description(self):
-        startup_cost = 0
-        run_cost = 2 * self.db.cpu_operator_cost * self.children[0].row_count
+        startup_cost = self.children[0].startup_cost
+        run_cost = self.children[0].total_cost - self.children[0].startup_cost + 2 * self.db.cpu_operator_cost * self.children[0].row_count
 
-        total_cost = (startup_cost * self.children[0].total_cost) + run_cost
+        tuples_size = self.children[0].row_count * self.children[0].row_width
+
+        # If the tuples size > work_mem, then the tuples are written to disk w ceil
+        write_to_disk = tuples_size > self.db.work_mem
+
+        if write_to_disk:
+            run_cost += self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size)
+            print("test")
+
+        total_cost = startup_cost + run_cost
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
         self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
-        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+        reason = "The answer may differ due to the intricate statistics (e.g. data alignment) that cannot be obtained from the query alone."
+        extra_description = f"""
+            Since the tuples size is greater than work_mem, the tuples are written to disk as the tuples are too large to fit in memory.
+            extra_run_cost  = seq_page_cost * ceil(tuples_size / block_size)
+            extra_run_cost  = {self.db.seq_page_cost} * ceil({tuples_size} / {self.db.block_size}) = {self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size)}
+
+            run_cost    += extra_run_cost
+            run_cost    = {run_cost} + {self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size)} 
+                        = {run_cost + self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size)}
+        """
 
         description = f"""
-            startup_cost = 0
-            startup_cost = {startup_cost}
-            run_cost = 2 * cpu_operator_cost * num_input_tuples
-            run_cost = 2 * {self.db.cpu_operator_cost} * {self.children[0].row_count} = {run_cost}
-            total_cost = (startup_cost * total_cost_of_scan) + run_cost = {total_cost}
+            startup_cost = input_startup_cost
+                         = {startup_cost}
+                            
+            run_cost = input_run_cost +  2 * cpu_operator_cost * num_input_tuples
+            run_cost = {self.children[0].total_cost - self.children[0].startup_cost} + 2 * {self.db.cpu_operator_cost} * {self.children[0].row_count} = {run_cost}
+
+            { extra_description if write_to_disk else "" }
+            total_cost = start_up_cost + run_cost = {total_cost}
             PostgreSQL total_cost = {psql_total_cost}
+
             Valid calculation? {"Yes" if self.valid else "No"}
             {"" if self.valid else reason}
         """
