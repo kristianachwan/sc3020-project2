@@ -166,15 +166,15 @@ class QueryTable(ttk.Frame):
         self.schema_table = ttk.Treeview(self.schema_table_frame, columns=["Relation", "Column"], show="tree headings")
         self.schema_table.pack(fill="both", expand=True)
 
-        self.schema_table.column("#0", width=1, anchor=tk.W, stretch=0)
+        self.schema_table.column("#0", width=40, anchor=tk.W)
         self.schema_table.heading("#1", text="Relation")
-        self.schema_table.column("#1", width=1, anchor=tk.W, stretch=0)
+        self.schema_table.column("#1", width=40, anchor=tk.W)
         self.schema_table.heading("#2", text="Column")
-        self.schema_table.column("#2", width=1, anchor=tk.W, stretch=0)
+        self.schema_table.column("#2", width=40, anchor=tk.W)
 
         for relation in relations:
             columns = db_con.get_column_names(relation)
-            par = self.schema_table.insert("", "end", values=[relation, ""])
+            par = self.schema_table.insert("", "end", values=[relation, ""])    
             for column in columns:
                 self.schema_table.insert(par, "end", values=["", column])
 
