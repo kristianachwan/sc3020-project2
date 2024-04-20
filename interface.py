@@ -88,7 +88,7 @@ class QueryExplanation(ttk.Frame):
         self.selected_node = None
         """
         self
-        |-> query_selection_frame
+        |-> query_selection_frame   
             |-> query_selection (treeview)
         |-> query_explanation_frame
             |-> query_explanation (label)
@@ -99,9 +99,13 @@ class QueryExplanation(ttk.Frame):
 
         self.query_selection_tree = ttk.Treeview(self.query_selection_frame, columns=("startup", "cost", "rows"), height=50)
         self.query_selection_tree.heading("#0", text="Query Plan")
+        self.query_selection_tree.column("#0", width=150)
         self.query_selection_tree.heading("#1", text="Startup Cost")
+        self.query_selection_tree.column("#1", width=120)
         self.query_selection_tree.heading("#2", text="Total Cost")
+        self.query_selection_tree.column("#2", width=120)
         self.query_selection_tree.heading("#3", text="Rows")
+        self.query_selection_tree.column("#3", width=80)
         
         # Onclick event (based on tags)
         self.query_selection_tree.pack(side = ttk.LEFT, fill="y")
@@ -411,10 +415,10 @@ class LayoutContent(ttk.Frame):
         self.query_table_frame = ttk.Frame(self.second_row, borderwidth=2)
         self.query_table_frame.pack(side = ttk.LEFT, fill="both", expand=True)
 
-        self.query_table = QueryTable(self.query_table_frame, width=480)
+        self.query_table = QueryTable(self.query_table_frame, width=560)
         self.query_table.pack(pady=4, padx = 8, side = ttk.LEFT, fill="both", expand=True)
 
-        self.query_explanation_frame = ttk.LabelFrame(self.second_row, borderwidth=2, text="Query Explanation", width=720)
+        self.query_explanation_frame = ttk.LabelFrame(self.second_row, borderwidth=2, text="Query Explanation", width=560)
         self.query_explanation_frame.pack(side = ttk.LEFT, pady=4)
 
         self.query_explanation = QueryExplanation(self.query_explanation_frame)
