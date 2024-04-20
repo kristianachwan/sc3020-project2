@@ -234,7 +234,7 @@ class Node:
             return self.get_materialize_description()
         elif self.node_type == 'Nested Loop':
             return self.get_nested_loop_join_description()
-        return 'Unfortunately, the portion of operation is beyond the scope of this project...'
+        return f'Unfortunately, the operation of type {self.node_type} is beyond the scope of this project.'
     
     # Lecture + PostgreSQL documentation
     def get_cost_description_sequential_scan(self): 
