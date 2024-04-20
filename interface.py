@@ -65,7 +65,10 @@ class QueryExplanation(ttk.Frame):
     def __recursive_update(self, node: Node, parent):
         def callback(event):
             self.selected_node = node
-            self.query_explanation.config(text=node.cost_description)
+            self.query_explanation.config(state=tk.NORMAL)
+            self.query_explanation.delete("1.0", ttk.END)
+            self.query_explanation.insert(tk.INSERT, node.cost_description)
+            self.query_explanation.config(state=tk.DISABLED)
 
         curnode = self.query_selection_tree.insert(parent, "end", text=node.node_type, values=(node.startup_cost, node.total_cost, node.row_count), tags=(node.node_type, node.uuid))
         self.query_selection_tree.tag_bind(node.uuid, "<<TreeviewSelect>>", callback=callback)
@@ -108,8 +111,10 @@ class QueryExplanation(ttk.Frame):
 
         explanation = "Click on the table to the left to see the explanation of the query plan."
 
-        self.query_explanation = ttk.Label(self.query_explanation_frame, text=explanation, anchor=ttk.NW)
-        self.query_explanation.pack(side = ttk.LEFT)
+        self.query_explanation = ttk.ScrolledText(self.query_explanation_frame)
+        self.query_explanation.pack(side = ttk.LEFT, fill="y")
+        self.query_explanation.insert(tk.INSERT, explanation)
+        self.query_explanation.config(state=tk.DISABLED)
 
 class QueryTable(ttk.Frame):
     def __init__(self, *args, **kwargs):
