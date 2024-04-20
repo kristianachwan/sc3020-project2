@@ -204,11 +204,6 @@ class Node:
     def get_label(self): 
         return f"""{self.node_type} {" - " + self.relation_name if self.relation_name else ""}\n{"cost: " + str(round(self.total_cost, 3))}"""
 
-    def get_value_status(self, actual_value, calculated_value):
-        if calculated_value > actual_value: 
-            return "\nOur system overestimate the value. "
-        else: return "\nOur system underestimate the value. " 
-
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
             if self.filter: 
@@ -248,7 +243,7 @@ class Node:
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
 
         underestimate_reason = """
-            The answer is underestimate due to the lack of information to the details needed to calculatae the intricate costs in Postgres.
+           The answer is underestimated due to the lack of information to the details needed to calculatae the intricate costs in Postgres.
         """
 
         overestimate_reason = """
@@ -262,7 +257,8 @@ class Node:
                  = (cpu_tuple_cost) * Ntuple + seq_page_cost * Npage
                  = ({cpu_tuple_cost}) * {row_count} + {seq_page_cost} * {page_count}
                  = {run_cost}
-        calculated_total_cost = startup_cost + run_cost 
+
+        total_cost = startup_cost + run_cost 
                               = {startup_cost} + {run_cost}
                               = {total_cost}
 
@@ -286,7 +282,14 @@ class Node:
         total_cost = startup_cost + run_cost 
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
 
-        reason = "The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+        underestimate_reason = """
+            The answer is underestimate due to the lack of information to the details needed to calculatae the intricate costs in Postgres.
+        """
+
+        overestimate_reason = """
+            The answer is overestimated due to Postgres implementing parallel scan, which is not considered in our calculation and not accounted in the lecture formula.
+        """
+
 
         description = f"""
         startup_cost = {startup_cost} (the cost to retrieve the first row)
@@ -296,17 +299,18 @@ class Node:
                  = (cpu_tuple_cost + cpu_operator_cost) * Ntuple + seq_page_cost * Npage
                  = ({cpu_tuple_cost + cpu_operator_cost}) * {row_count} + {seq_page_cost} * {page_count}
                  = {run_cost}
-        calculated_total_cost = startup_cost + run_cost 
+
+        total_cost = startup_cost + run_cost 
                               = {startup_cost} + {run_cost}
                               = {total_cost}
 
         psql_total_cost = {self.total_cost}
 
         Is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
-        {"" if self.valid else reason}
+        {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
         """
         return description
-    
+
     # Sort cost = start_up cost + run cost
     # start_up cost = cost_of_last_scan + 2 * cpu_operator_cost * number_of_input_tuples * log2(number_of_input_tuples)
         # cost_of_last_scan -> can write function to fetch it. For now just assume some constant value
@@ -328,53 +332,70 @@ class Node:
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
         self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
-        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+        reason = "The calculation may differ due to variations in some cases, such as the output is bigger than the work_mem, which will cause the tuples to be written to disk."
 
         description = f"""
         startup_cost = {startup_cost}
 
         run_cost = {cpu_operator_cost} * {num_input_tuples} = {run_cost}
-        total_cost = startup_cost + run_cost = {total_cost}
-        PostgreSQL total_cost = {psql_total_cost}
-        Is this a valid calculation? {"Yes" if self.valid else "No"} (with epsilon = {self.epsilon})
+        total_cost = startup_cost + run_cost 
+                   = {startup_cost} + {run_cost}
+                   = {total_cost}
+
+        psql_total_cost = {psql_total_cost}
+
+        Is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
         {"" if self.valid else reason}
         """
         
         return description
     
-    # Sort merge join cost = start_up cost + run cost
-    # startup_cost = num_input_tuples_rel_out*log2(num_input_tuples_rel_in) + num_input_tuples_rel_in * log2(num_input_tuples_rel_out)
-    # run cost = num_input_tuples_rel_in + num_input_tuples_rel_out
     def get_sort_merge_join_description(self):
-        # compare sizes of 2 input relations. Smaller relation is rel_out and larger relation is rel_in
-        if self.children[0].row_count < self.children[1].row_count:
-            rel_inner = self.children[1]
-            rel_outer = self.children[0]
-        else:
-            rel_inner = self.children[0]
-            rel_outer = self.children[1]
+        """
+        - Using 2PMMS join algorithm 3(B(S) + B(R))
+        - B(S) = number of blocks in the smaller relation
+        - B(R) = number of blocks in the larger relation
+        """
+        rel_s = self.children[0]
+        rel_r = self.children[1]
 
-        num_input_tuples_rel_out = rel_outer.row_count
-        num_input_tuples_rel_in = rel_inner.row_count
+        b_s = math.ceil(rel_s.row_count * rel_s.row_width / self.db.block_size)
+        b_r = math.ceil(rel_r.row_count * rel_r.row_width / self.db.block_size)
 
-        startup_cost = num_input_tuples_rel_out*math.log2(num_input_tuples_rel_in) + num_input_tuples_rel_in*math.log2(num_input_tuples_rel_out)
+        total_cost = 3 * (b_s + b_r) * self.db.seq_page_cost
 
-        run_cost = num_input_tuples_rel_in + num_input_tuples_rel_out
-        total_cost = startup_cost + run_cost
-        
-        # Confirmation values from EXPLAIN command
-        psql_total_cost = self.total_cost  
-        self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
-        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
+        self.valid = abs(total_cost - self.total_cost) <= self.epsilon
+
+        reason = f"""
+            Our cost is {"underestimated" if total_cost <= self.total_cost else "overestimated"}.
+            The calculation done by PostgreSQL is different from ours due to the fact that we are using simple formulas that just count the number of I/O and applying the weights to them. 
+            PostgreSQL uses a more sophisticated cost model that incorporates statistics and histograms to estimate the selectivity of the join, which is not obtainable via SQL query.
+        """
 
         description = f"""
-        startup_cost = {startup_cost}
-        run_cost = {num_input_tuples_rel_in} + {num_input_tuples_rel_out} = {run_cost}
-        total_cost = startup_cost + run_cost = {total_cost}
-        PostgreSQL total_cost = {psql_total_cost}
-        Valid calculation? {"Yes" if self.valid else "No"}
-        {"" if self.valid else reason}
+            Assumptions:
+                - The merge join function cost is using 2PMMS join algorithm
+                - Negligible block header
+
+            Using merge join algorithm taught in the lecture 3(num_blocks_S + num_blocks_R)
+            num_blocks_S = ceil(row_count_S / row_width_S)
+                         = ceil({rel_s.row_count} / {rel_s.row_width})
+                         = {b_s}
+            
+            num_blocks_R = row_count_R / row_width_R
+                         = ceil({rel_r.row_count} / {rel_r.row_width})
+                         = {b_r}
+            
+            total_cost = 3 * (num_blocks_S + num_blocks_R) * seq_page_cost
+                       = 3 * ({b_s} + {b_r}) * {self.db.seq_page_cost}
+                       = {total_cost}
+
+            psql_total_cost = {self.total_cost}
+
+            Is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
+
         return description
     
     def get_nested_loop_join_description(self):
@@ -427,6 +448,8 @@ class Node:
                 total_cost  = startup_cost + run_cost
                             = {total_cost}
 
+                psql_total_cost = {self.total_cost}
+
                 Valid calculation? {"Yes" if self.valid else "No"}
                 {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
             """
@@ -443,8 +466,10 @@ class Node:
                          = ({self.db.cpu_tuple_cost} + {rel_inner.startup_cost}) * {num_input_tuples_rel_out} + {cost_rel_out}
                          = {run_cost}
 
-                total_cost  = startup_cost + run_cost
+                total_cost = startup_cost + run_cost
 
+                psql_total_cost = {self.total_cost}
+                
                 Valid calculation? {"Yes" if self.valid else "No"}
                 {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
             """
@@ -458,17 +483,17 @@ class Node:
                          = ({num_blocks_rel_out} + {num_blocks_rel_in} * {num_input_tuples_rel_out}) * {self.db.seq_page_cost}
                          = {run_cost}
 
+                total_cost = {startup_cost} + {run_cost}
+
+                psql_total_cost = {self.total_cost}
+
                 Valid calculation? {"Yes" if self.valid else "No"}
                 {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
             """ 
 
-        
-
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
         self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
-        reason = "The calculation may differ due to variations in system configurations or PostgreSQL versions."
-
         
         return description
 
@@ -518,14 +543,15 @@ class Node:
             { extra_description if write_to_disk else "" }
 
             total_cost = start_up_cost + run_cost = {total_cost}
-            PostgreSQL total_cost = {psql_total_cost}
+
+            psql_total_cost = {psql_total_cost}
 
             Valid calculation? {"Yes" if self.valid else "No"}
             {"" if self.valid else reason}
         """
         return description
 
-    # ESTIMATED
+    # Estimated 
     def get_index_scan_description(self):
         """
         Using the lecture formula:
@@ -537,8 +563,6 @@ class Node:
                                = reltuple / relpages
             - height = log(relpages) / log(branching factor)
             - data blocks = number of tuples / number of tuples in a block * 0.5
-
-
         """
 
         index_relation_name = self.query_plan['Index Name']
@@ -546,23 +570,20 @@ class Node:
         num_index_pages, num_index_tuples = index_statistics['relpages'], index_statistics['reltuples']
 
         row_count = self.db.get_table_row_count(self.relation_name)
-
         branching_factor = num_index_tuples / num_index_pages
-
         height_of_index = math.log(num_index_pages) / math.log(branching_factor)
-
         avg_data_blocks = row_count / branching_factor * 0.5
-
         avg_cost = (height_of_index + avg_data_blocks + self.db.get_table_page_count(self.relation_name) / 2) * self.db.random_page_cost
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
         self.valid = abs(avg_cost - psql_total_cost) <= self.epsilon
         reason = f"""
+            Our cost is {"underestimated" if avg_cost <= psql_total_cost else "overestimated"}.
             The calculation from the EXPLAIN query differs from our calculation due to the limited information provided by the database interface.
             PostgreSQL uses data from histograms and statistics to estimate the selectivity, which the data is not available through SQL query.
             Thus, it is impossible to obtain the exact cost of the index scan operation using the SQL query alone.
-            """
+        """
 
         description = f"""
             As there are various types of indexes in PostgreSQL, there will be several assumptions being made:
@@ -584,10 +605,10 @@ class Node:
             avg_cost = (height_of_index + avg_data_blocks + rel_pages / 2) * random_page_cost
                      = {height_of_index} + {row_count / branching_factor * 0.5} + {self.db.get_table_page_count(self.relation_name) / 2} * {self.db.random_page_cost}
                      = {avg_cost}
-
                                 
             total_cost = {avg_cost}
-            PostgreSQL total_cost = {psql_total_cost}
+
+            psql_total_cost = {psql_total_cost}
 
             Valid calculation? {"Yes" if self.valid else "No"}
             {"" if self.valid else reason}
@@ -601,29 +622,34 @@ class Node:
         estimated_rows = self.children[0].row_count
         actual_row_count = self.acutal_row_count
         psql_total_cost = self.total_cost
-        reason = "WHY? The strategy of the aggregate is different hence the calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+        reason = f"""
+            Our cost is {"underestimated" if total_cost <= psql_total_cost else "overestimated"}.
+            The strategy of the aggregate is different hence the calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative.
+        """
         total_cost = prev_totalcost + (estimated_rows * cpu_operator_cost) + (actual_row_count * cpu_tuple_cost)
         formula = f"""
             total_cost = (cost of Seq Scan) + (estimated rows processed * cpu_operator_cost) + (estimated rows returned * cpu_tuple_cost)
-                = ({prev_totalcost}) + ({estimated_rows} * {cpu_operator_cost}) + ({actual_row_count} * {cpu_tuple_cost}) 
-                = {total_cost}
+                       = ({prev_totalcost}) + ({estimated_rows} * {cpu_operator_cost}) + ({actual_row_count} * {cpu_tuple_cost}) 
+                       = {total_cost}
         """
 
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
         description = f"""
             {formula}
-            PostgreSQL total_cost = {psql_total_cost}
-                is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
-                {"" if self.valid else reason}
+            psql_total_cost = {psql_total_cost}
+            is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
+            {"" if self.valid else reason}
         """
         return description
 
-    # unfinished
     def get_cost_description_hash(self): 
         total_cost = self.children[0].total_cost
         psql_total_cost = self.total_cost  
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
-        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+        reason = f"""
+            Our cost is {"underestimated" if total_cost <= self.total_cost else "overestimated"}.
+            The calculation requires more statistics that are not available outside of external PostgreSQL codebase. 
+        """
 
         description = f"""
             As observed in PostgresSQL, hash cost are passed hence we will do the same.
@@ -653,7 +679,9 @@ class Node:
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
 
         reason = f"""
-            The calculation done by PostgreSQL is different from ours due to the hash join can be done in multiple batches, it incorporates statistics (for example most common values) - which is not obtainable via SQL query. It also uses a different cost model (hash_qual_cost and qp_qual_cost) to estimate the cost, which causes our estimate to be far below than PostgreSQL's.
+            Our cost is {"underestimated" if total_cost <= self.total_cost else "overestimated"}.
+            The calculation done by PostgreSQL is different from ours due to the hash join can be done in multiple batches, it incorporates statistics (for example most common values) - which is not obtainable via SQL query. 
+            It also uses a different cost model (hash_qual_cost and qp_qual_cost) to estimate the cost, which causes our estimate to be far below than PostgreSQL's.
         """
 
         description = f"""
@@ -675,6 +703,8 @@ class Node:
                        = 3 * ({b_s} + {b_r}) * {self.db.seq_page_cost}
                        = {total_cost}
 
+            psql_total_cost = {self.total_cost}
+                       
             Is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
             {"" if self.valid else reason}
         """
@@ -692,7 +722,10 @@ class Node:
         total_cost = startup_cost + run_cost
         psql_total_cost = self.total_cost  
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
-        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+        reason = f"""
+            Our cost is {"underestimated" if total_cost <= self.total_cost else "overestimated"}.
+            The calculation requires more statistics that are not available outside of external PostgreSQL codebase. 
+        """
 
         description = f"""
             Total cost of Gather
@@ -705,7 +738,9 @@ class Node:
             total cost = (startup_cost) + (run_cost)
                        = ({startup_cost} + {run_cost})
                        = {total_cost}
-            PostgreSQL total_cost = {psql_total_cost}
+
+            psql_total_cost = {psql_total_cost}
+
             is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
             {"" if self.valid else reason}
         """
@@ -729,7 +764,10 @@ class Node:
         total_cost = startup_cost + run_cost
         psql_total_cost = self.total_cost  
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
-        reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
+        reason = f"""
+            Our cost is {"underestimated" if total_cost <= self.total_cost else "overestimated"}.
+            The calculation requires more statistics that are not available outside of external PostgreSQL codebase. 
+        """
 
         description = f"""
             n = workers + 1
@@ -744,10 +782,13 @@ class Node:
             run_cost = (planned_row * comparison_cost * logN) + (cpu_operator_cost * planned_row) + (parallel_tuple_cost * planned_row * 1.05)
                 = ({planned_row} * {comparison_cost} * {logN}) + ({cpu_operator_cost} * {planned_row}) + ({parallel_tuple_cost} * {planned_row} * 1.05)
                 = {run_cost}
+
             total cost = (startup_cost) + (run_cost)
                 = {startup_cost} + {run_cost}
                 = {total_cost}
-            PostgreSQL total_cost = {psql_total_cost}
+
+            psql_total_cost = {psql_total_cost}
+
             is it a valid calculation? {"YES" if self.valid else "NO"} (with epsilon = {self.epsilon})
             {"" if self.valid else reason}
         """
