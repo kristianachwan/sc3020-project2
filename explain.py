@@ -240,6 +240,8 @@ class Node:
             return self.get_cost_description_sequential_scan() 
         elif self.node_type == 'Sort':
             return self.get_sort_cost_description()
+        elif self.node_type == 'Merge Join':
+            return self.get_sort_merge_join_description()
         elif self.node_type == 'Hash':
             return self.get_cost_description_hash() 
         elif self.node_type == 'Aggregate':
@@ -365,7 +367,6 @@ class Node:
             rel_inner = self.children[0]
             rel_outer = self.children[1]
 
-        # need to define a function to fetch number of tuples from the can of rel_out and rel_in
         num_input_tuples_rel_out = rel_outer.row_count
         num_input_tuples_rel_in = rel_inner.row_count
 
