@@ -386,7 +386,7 @@ class Node:
             rel_inner = self.children[0]
             rel_outer = self.children[1]
 
-            num_input_tuples_rel_out = rel_outer.row_count
+        num_input_tuples_rel_out = rel_outer.row_count
         num_input_tuples_rel_in = rel_inner.row_count
 
         size_tuple_rel_out = rel_outer.row_width
