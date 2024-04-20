@@ -296,6 +296,7 @@ class Node:
         run_cost = (cpu_tuple_cost + cpu_operator_cost) * row_count + seq_page_cost * page_count
         total_cost = startup_cost + run_cost 
         self.valid = abs(total_cost - self.total_cost) <= self.epsilon
+
         reason = "WHY? The calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative."
 
         description = f"""
@@ -434,24 +435,30 @@ class Node:
         # If the tuples size > work_mem, then the tuples are written to disk w ceil
         write_to_disk = tuples_size > self.db.work_mem
 
-        if write_to_disk:
-            run_cost += self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size)
-            print("test")
+        extra_run_cost = 0
 
-        total_cost = startup_cost + run_cost
+        if write_to_disk:
+            extra_run_cost = self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size) 
+
+        total_cost = startup_cost + run_cost + extra_run_cost
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
         self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
-        reason = "The answer may differ due to the intricate statistics (e.g. data alignment) that cannot be obtained from the query alone."
+        
+        overestimation_reason = "The answer may differ due to the intricate statistics that cannot be obtained from the query alone."
+        underestimation_reason = "The answer is different due to the underestimated size of each tuples which requires intricate statistics (such as byte alignment rule) that cannot be obtained from the query alone."
+
+        reason = overestimation_reason if total_cost > psql_total_cost else underestimation_reason
+
         extra_description = f"""
             Since the tuples size is greater than work_mem, the tuples are written to disk as the tuples are too large to fit in memory.
             extra_run_cost  = seq_page_cost * ceil(tuples_size / block_size)
             extra_run_cost  = {self.db.seq_page_cost} * ceil({tuples_size} / {self.db.block_size}) = {self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size)}
 
             run_cost    += extra_run_cost
-            run_cost    = {run_cost} + {self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size)} 
-                        = {run_cost + self.db.seq_page_cost * math.ceil(tuples_size / self.db.block_size)}
+            run_cost    = {run_cost} + {extra_run_cost} 
+                        = {run_cost + extra_run_cost}
         """
 
         description = f"""
