@@ -508,9 +508,7 @@ class Node:
         cost_rel_out = rel_outer.total_cost
         cost_rel_in = rel_inner.total_cost
 
-        startup_cost = 0
-        run_cost = 0
-        total_cost = 0
+
         psql_total_cost = self.total_cost
         
         description = ""
@@ -525,7 +523,7 @@ class Node:
         
 
         if rel_inner.node_type == 'Materialize' and rel_outer.node_type == 'Seq Scan':
-
+            startup_cost = 0
             rescan_cost =  self.db.cpu_operator_cost * num_input_tuples_rel_out
 
             run_cost = (self.db.cpu_operator_cost + self.db.cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + rescan_cost * (num_input_tuples_rel_in - 1) + cost_rel_out    
@@ -571,6 +569,7 @@ class Node:
                 {"" if self.valid else underestimate_reason if total_cost <= self.total_cost else overestimate_reason}
             """
         else:
+            startup_cost = 0
             run_cost = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out) * self.db.seq_page_cost
             total_cost = startup_cost + run_cost
             self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
