@@ -245,7 +245,13 @@ class DB:
             WHERE name = 'work_mem';
         """)[0][0][0])
 
+"""
+Class Node is the class to represent a node in the physical query plan.
+"""
 class Node: 
+    """
+    Constructor to instantiate a Node object.
+    """
     def __init__(self, query_plan, db: DB, children, epsilon): 
         self.query_plan = query_plan
         self.db = db 
@@ -267,18 +273,25 @@ class Node:
         self.valid = False
         self.cost_description = self.get_cost_description() 
 
+    """
+    Method to get the label for the graph visualization for each node.
+    """
     def get_label(self): 
-        return f"""{self.node_type + (" with filter" if self.filter else "")} {" - " + self.relation_name if self.relation_name else ""}\n{"cost: " + str(round(self.total_cost, 3))}"""
+        return f"""{self.node_type + (" with filter " if self.filter else "")} {"- " + self.relation_name if self.relation_name else ""}\n{"cost: " + str(round(self.total_cost, 3))}"""
 
+    """
+    Method to get the cost description for each node. For different node_type, we have different cost description function. 
+    This function acts as the general function to call the specific cost description function based on the node_type.
+    """
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
             if self.filter: 
                 return self.get_cost_description_sequential_scan_with_filter() 
             return self.get_cost_description_sequential_scan() 
         elif self.node_type == 'Sort':
-            return self.get_sort_cost_description()
+            return self.get_cost_description_sort()
         elif self.node_type == 'Merge Join':
-            return self.get_sort_merge_join_description()
+            return self.get_cost_description_merge_join()
         elif self.node_type == 'Hash':
             return self.get_cost_description_hash() 
         elif self.node_type == 'Aggregate':
@@ -290,14 +303,17 @@ class Node:
         elif self.node_type == 'Gather Merge':
             return self.get_cost_description_gather_merge() 
         elif self.node_type == 'Index Scan': 
-            return self.get_index_scan_description()
+            return self.get_cost_description_index_scan()
         elif self.node_type == 'Materialize':
-            return self.get_materialize_description()
+            return self.get_cost_description_materialize()
         elif self.node_type == 'Nested Loop':
-            return self.get_nested_loop_join_description()
+            return self.get_cost_description_nested_loop()
         return f'Unfortunately, the operation of type {self.node_type} is beyond the scope of this project.'
     
-    # Lecture + PostgreSQL documentation
+    """
+    Method to get the cost of sequential scan. 
+    We combine what we learnt from the lecture and the PostgreSQL documentation to calculate the cost of the sequential scan by applyin appropriate weight. 
+    """
     def get_cost_description_sequential_scan(self): 
         cpu_tuple_cost = self.db.cpu_tuple_cost
         row_count = self.row_count
@@ -336,7 +352,11 @@ class Node:
 
         return description
     
-    # Not covered in lecture
+    
+    """
+    Method to get the cost of sequential scan with filter. 
+    Similar to get_cost_description_sequential_scan() method, yet we need to consider the filter condition in the cost calculation by adding the term cpu_operator_cost * number_of_input_tuples.
+    """
     def get_cost_description_sequential_scan_with_filter(self): 
         cpu_tuple_cost = self.db.cpu_tuple_cost
         cpu_operator_cost = self.db.cpu_operator_cost
@@ -377,14 +397,12 @@ class Node:
         """
         return description
 
-    # Sort cost = start_up cost + run cost
-    # start_up cost = cost_of_last_scan + 2 * cpu_operator_cost * number_of_input_tuples * log2(number_of_input_tuples)
-        # cost_of_last_scan -> can write function to fetch it. For now just assume some constant value
-        # cpu_operator_cost -> db.cpu_operator_cost or default value is 0.0025
-        # number_of_input_tuples -> fetch 'rows' attribute of sequential scan
-    # run cost = cpu_operator_cost *  number_of_input_tuples
-    def get_sort_cost_description(self):
-        cpu_operator_cost = self.db.cpu_operator_cost # if this doesn't work then the default value is 0.0025
+    """
+    Method to get the cost of sort operation. 
+    For the startup_cost and run_cost, we mimic the implementation of PostgreSQL. 
+    """
+    def get_cost_description_sort(self):
+        cpu_operator_cost = self.db.cpu_operator_cost 
         comparison_cost = 2 * cpu_operator_cost
         num_input_tuples = self.children[0].row_count # fetch number of tuples returned from the scan operator cost. 
         log_sort_tuples = math.log2(num_input_tuples)
@@ -416,7 +434,12 @@ class Node:
         
         return description
     
-    def get_sort_merge_join_description(self):
+    """
+    Method to get the cost of merge join operation. 
+    We estimate the number of blocks my measuring the number of blocks in the smaller relation and the larger relation by using database catalog. 
+    blocks = ceil(row_count * row_width / block_size).
+    """
+    def get_cost_description_merge_join(self):
         """
         - Using 2PMMS join algorithm 3(B(S) + B(R))
         - B(S) = number of blocks in the smaller relation
@@ -464,7 +487,11 @@ class Node:
 
         return description
     
-    def get_nested_loop_join_description(self):
+    """
+    Method to get nested loop join cost description.
+    We have 3 variants for nested loop join: index-based, materialized, and normal nested loop join.
+    """
+    def get_cost_description_nested_loop(self):
         # compare sizes of 2 input relations. Smaller relation is rel_out and larger relation is rel_in
         if self.children[0].row_count < self.children[1].row_count:
             rel_inner = self.children[1]
@@ -563,7 +590,10 @@ class Node:
         
         return description
 
-    def get_materialize_description(self):
+    """
+    Method to get the cost description of materialize operation.
+    """
+    def get_cost_description_materialize(self):
         startup_cost = self.children[0].startup_cost
         run_cost = self.children[0].total_cost - self.children[0].startup_cost + 2 * self.db.cpu_operator_cost * self.children[0].row_count
 
@@ -617,8 +647,11 @@ class Node:
         """
         return description
 
-    # Estimated 
-    def get_index_scan_description(self):
+    """
+    Method to get the cost description of index scan. 
+    Getting the exact number of height_of_index in this case is not possible, therefore we calculate the cost as the average of index page access. 
+    """
+    def get_cost_description_index_scan(self):
         """
         Using the lecture formula:
 
@@ -681,6 +714,10 @@ class Node:
             """
         return description
     
+    """
+    Method to get the cost description of aggregate. 
+    We mimic the implementation of PostgreSQL to calculate the cost of the aggregate operation.
+    """
     def get_cost_description_aggregate(self): 
         cpu_tuple_cost = self.db.cpu_tuple_cost
         cpu_operator_cost = self.db.cpu_operator_cost
@@ -709,6 +746,10 @@ class Node:
         """
         return description
 
+    """
+    Method to get the cost description of hash. 
+    We mimic the implementation of PostgreSQL to calculate the cost of the hash operation.
+    """
     def get_cost_description_hash(self): 
         total_cost = self.children[0].total_cost
         psql_total_cost = self.total_cost  
@@ -728,7 +769,10 @@ class Node:
         """
         return description
     
-    # Estimation
+    """
+    Method to get the cost description of hash join.
+    We apply the knowledge from the lecture to calculate the cost of the hash join operation, weighted by the seq_page_cost. 
+    """
     def get_cost_description_hash_join(self):
         """
         - Using grace hash join algorithm 3(B(S) + B(R))
@@ -778,6 +822,10 @@ class Node:
 
         return description
     
+    """
+    Method to get the cost description of gather operation. 
+    We mimic the imlpeentation of PostgreSQL to calculate the cost of the gather operation.
+    """
     def get_cost_description_gather(self): 
         parallel_setup_cost = self.db.parallel_setup_cost
         parallel_tuple_cost = self.db.parallel_tuple_cost
@@ -813,6 +861,10 @@ class Node:
         """
         return description
     
+    """
+    Method to get the cost description of gather merge operation.
+    We mimic the imlpeentation of PostgreSQL to calculate the cost of the gather merge operation.
+    """
     def get_cost_description_gather_merge(self): 
         cpu_operator_cost = self.db.cpu_operator_cost
         parallel_setup_cost = self.db.parallel_setup_cost
@@ -860,13 +912,23 @@ class Node:
             {"" if self.valid else reason}
         """
         return description
-    
+
+"""
+Class Graph is a class to represent the whole graph of the physical query plan. 
+This serves as a wrapper class to parse the query plan and create the graph.
+"""
 class Graph:    
+    """
+    Constructor to instantiate a Graph object.
+    """
     def __init__(self, query_plan, db: DB, epsilon): 
         self.db = db 
         self.epsilon = epsilon
         self.root = self.parse_query_plan(query_plan)
     
+    """
+    Method to parse the query plan and create the graph.
+    """
     def parse_query_plan(self, query_plan):
         children = []
         if 'Plans' in query_plan: 
@@ -875,14 +937,24 @@ class Graph:
 
         node = Node(query_plan, self.db, children, self.epsilon)
         return node 
-    
+
+"""
+Class GraphVisualizer is a class to visualize the graph of the physical query plan by parsing the Graph object. 
+It leverages graphviz library to create the visualization of the graph
+"""
 class GraphVisualizer: 
+    """
+    Constructor to instantiate a GraphVisualizer object.
+    """
     def __init__(self, graph):
         self.graphviz = graphviz.Digraph('G', filename='qep', format='png')
         self.graphviz.attr(rankdir='BT')
         self.parse_graph(graph.root)
         self.graphviz.render('assets/img/qep')
 
+    """
+    Method to parse the graph and create the visualization.
+    """
     def parse_graph(self, node: Node):
         if not node.valid: 
             self.graphviz.node(node.uuid, node.get_label(), fillcolor='cyan', style='filled')
