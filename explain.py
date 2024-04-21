@@ -826,7 +826,7 @@ class Node:
     
     """
     Method to get the cost description of gather operation. 
-    We mimic the imlpeentation of PostgreSQL to calculate the cost of the gather operation.
+    We mimic the implementation of PostgreSQL to calculate the cost of the gather operation.
     """
     def get_cost_description_gather(self): 
         parallel_setup_cost = self.db.parallel_setup_cost
@@ -865,7 +865,7 @@ class Node:
     
     """
     Method to get the cost description of gather merge operation.
-    We mimic the imlpeentation of PostgreSQL to calculate the cost of the gather merge operation.
+    We mimic the implementation of PostgreSQL to calculate the cost of the gather merge operation.
     """
     def get_cost_description_gather_merge(self): 
         cpu_operator_cost = self.db.cpu_operator_cost
