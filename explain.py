@@ -621,12 +621,13 @@ class Node:
         prev_totalcost = self.children[0].total_cost
         estimated_rows = self.children[0].row_count
         actual_row_count = self.acutal_row_count
+        total_cost = prev_totalcost + (estimated_rows * cpu_operator_cost) + (actual_row_count * cpu_tuple_cost)
+
         psql_total_cost = self.total_cost
         reason = f"""
             Our cost is {"underestimated" if total_cost <= psql_total_cost else "overestimated"}.
             The strategy of the aggregate is different hence the calculation requires more sophisticated information about DB and these informations are unable to be fetched using query that are more declarative.
         """
-        total_cost = prev_totalcost + (estimated_rows * cpu_operator_cost) + (actual_row_count * cpu_tuple_cost)
         formula = f"""
             total_cost = (cost of Seq Scan) + (estimated rows processed * cpu_operator_cost) + (estimated rows returned * cpu_tuple_cost)
                        = ({prev_totalcost}) + ({estimated_rows} * {cpu_operator_cost}) + ({actual_row_count} * {cpu_tuple_cost}) 
