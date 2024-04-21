@@ -534,6 +534,9 @@ class Node:
                 startup_cost = {startup_cost}
                 The cost to retrieve the first row is zero
 
+                rescan = cpu_operator_cost * num_input_tuples_rel_out
+
+
                 run_cost = (cpu_operator_cost + cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + rescan_cost * (size_tuple_rel_out - 1) + cost_rel_out
                             = ({self.db.cpu_operator_cost} + {self.db.cpu_tuple_cost}) * {num_input_tuples_rel_out} * {num_input_tuples_rel_in} + {rescan_cost} * ({num_input_tuples_rel_out} - 1) + {cost_rel_out}
                             = {run_cost}
@@ -548,21 +551,22 @@ class Node:
             """
         elif rel_inner.node_type == 'Index Scan' and rel_outer.node_type == 'Seq Scan':
             startup_cost = rel_inner.startup_cost
-            run_cost = (self.db.cpu_tuple_cost + rel_inner.startup_cost) * num_input_tuples_rel_out + cost_rel_out
+            total_cost = (self.db.cpu_tuple_cost + rel_inner.total_cost) * num_input_tuples_rel_out + cost_rel_out
 
-            total_cost = startup_cost + run_cost
+            run_cost = total_cost - startup_cost
             self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
 
             description = f"""
                 startup_cost = {startup_cost}
 
-                run_cost = (cpu_tuple_cost + startup_cost) * num_input_tuples_rel_out + cost_rel_out
-                         = ({self.db.cpu_tuple_cost} + {rel_inner.startup_cost}) * {num_input_tuples_rel_out} + {cost_rel_out}
+                total_cost = (cpu_tuple_cost + cost_rel_in) * num_input_tuples_rel_out + cost_rel_out
+                         = ({self.db.cpu_tuple_cost} + {rel_inner.total_cost}) * {num_input_tuples_rel_out} + {cost_rel_out}
                          = {run_cost}
 
-                total_cost = startup_cost + run_cost
-                            = {total_cost}
+                run_cost = total_cost - startup_cost
+                         = {run_cost}
 
+                total_cost = {total_cost}
                 psql_total_cost = {self.total_cost}
                 
                 Valid calculation? {"Yes" if self.valid else "No"}
@@ -570,14 +574,30 @@ class Node:
             """
         else:
             startup_cost = 0
-            run_cost = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out) * self.db.seq_page_cost
+            m = self.db.work_mem / self.db.block_size
+            run_cost = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out / m) * self.db.seq_page_cost
             total_cost = startup_cost + run_cost
             self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
+
+            
+
             description = f"""
                 Using the lecture's formula,
+
+                num_blocks_rel_out = ceil(size_tuple_rel_out * num_input_tuples_rel_out / block_size)
+                                    = ceil({size_tuple_rel_out} * {num_input_tuples_rel_out} / {self.db.block_size})
+                                    = {num_blocks_rel_out}
+
+                num_blocks_rel_in = ceil(size_tuple_rel_in * num_input_tuples_rel_in / block_size)
+                                    = ceil({size_tuple_rel_in} * {num_input_tuples_rel_in} / {self.db.block_size})
+                                    = {num_blocks_rel_in}
                 
-                run_cost = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out) * seq_page_cost
-                         = ({num_blocks_rel_out} + {num_blocks_rel_in} * {num_input_tuples_rel_out}) * {self.db.seq_page_cost}
+                m   = work_mem / block_size
+                    = {self.db.work_mem} / {self.db.block_size}
+                    = {m}
+                
+                run_cost = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out / m) * seq_page_cost
+                         = ({num_blocks_rel_out} + {num_blocks_rel_in} * {num_input_tuples_rel_out} / {m}) * {self.db.seq_page_cost}
                          = {run_cost}
 
                 total_cost = {startup_cost} + {run_cost}
