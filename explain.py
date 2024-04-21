@@ -202,7 +202,7 @@ class Node:
         self.cost_description = self.get_cost_description() 
 
     def get_label(self): 
-        return f"""{self.node_type} {" - " + self.relation_name if self.relation_name else ""}\n{"cost: " + str(round(self.total_cost, 3))}"""
+        return f"""{self.node_type + " with filter" if self.filter else ""} {" - " + self.relation_name if self.relation_name else ""}\n{"cost: " + str(round(self.total_cost, 3))}"""
 
     def get_cost_description(self): 
         if self.node_type == 'Seq Scan':
