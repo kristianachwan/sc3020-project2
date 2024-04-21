@@ -7,8 +7,13 @@ from PIL import ImageTk, Image
 TEXT_PRIMARY_COLOR = "#F9F9F9"
 TEXT_SECONDARY_COLOR = "grey"
 
-### COMPONENTS ###
+"""
+Class Input is the base class component for the input fields in QUPEX.
+"""
 class Input(ttk.Entry):
+    """
+    Constructor to instantaite the Input class.
+    """
     def __init__(self, master=None, placeholder="", default_value=None, **kwargs):
         self.is_empty = True
         self.color = TEXT_PRIMARY_COLOR
@@ -23,7 +28,6 @@ class Input(ttk.Entry):
         self.bind("<FocusIn>", self.foc_in)
         self.bind("<FocusOut>", self.foc_out)
         
-
         if default_value:
             self.insert(0, default_value)
             self.is_empty = False
@@ -31,14 +35,19 @@ class Input(ttk.Entry):
             self.configure(show="")
             self.insert(0, self.placeholder)
             self.configure(foreground=self.placeholder_color)
-        
-
+    
+    """
+    Method to handle the focus in event.
+    """
     def foc_in(self, *args):
         if self.is_empty:
             self.delete("0", "end")
             self.configure(show=self.show)
             self.configure(foreground=self.color)
 
+    """
+    Method to handle the focus in event.
+    """
     def foc_out(self, *args):
         if not self.get():
             self.configure(show="")
@@ -48,7 +57,13 @@ class Input(ttk.Entry):
         else:
             self.is_empty = False
 
+"""
+Class InputWithLabel is a component that contains an input field and a label.
+"""
 class InputWithLabel(ttk.Frame):
+    """
+    Constructor to instantiate the InputWithLabel class.
+    """
     def __init__(self, master=None, label_text="", placeholder="", default_value=None, show="", **kwargs):
         super().__init__(master, **kwargs)
         self.pack()
@@ -59,9 +74,13 @@ class InputWithLabel(ttk.Frame):
         self.entry = Input(self, placeholder=placeholder, default_value=default_value, show=show, )
         self.entry.pack(side = ttk.TOP)         
 
-### CONTENT SUBLAYOUTS ###
+"""
+Class QueryExplanation is a component that contains the query plan treeview and the explanation of the selected node.
+"""
 class QueryExplanation(ttk.Frame):
-
+    """
+    Method to recursively update the treeview.
+    """
     def __recursive_update(self, node: Node, parent):
         def callback(event):
             self.selected_node = node
@@ -75,13 +94,17 @@ class QueryExplanation(ttk.Frame):
         for child in node.children:
             self.__recursive_update(child, curnode)
 
+    """
+    Method to update the treeview.
+    """
     def update_treeview(self, event):
-
         root: Node = self.master.master.master.master.inner_state.graph.root
         self.query_selection_tree.delete(*self.query_selection_tree.get_children())
         self.__recursive_update(root, "")
 
-
+    """
+    Constructor to instantiate the QueryExplanation class.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack(expand=True, fill="both")
@@ -120,7 +143,13 @@ class QueryExplanation(ttk.Frame):
         self.query_explanation.insert(tk.INSERT, explanation)
         self.query_explanation.config(state=tk.DISABLED)
 
+"""
+Class QueryTable is a component that contains the statistics of the database and the schema of the database.
+"""
 class QueryTable(ttk.Frame):
+    """
+    Constructor to instantiate the QueryTable class.    
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
@@ -187,8 +216,13 @@ class QueryTable(ttk.Frame):
         self.notebook.add(self.schema_table_frame, text="Schemas")
 
         
-
+"""
+Class SQLInput is a component that contains the input field for the SQL query.
+"""
 class SQLInput(ttk.Frame):
+    """
+    Method to execute the query.
+    """
     SQL_KEYWORDS = ["SELECT", "FROM", "WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "NATURAL JOIN", "USING", "ON", "AS", "AND", "OR", "NOT", "IN", "LIKE", "BETWEEN", "IS", "NULL", "EXISTS", "ALL", "ANY", "SOME", "UNION", "INTERSECT", "EXCEPT", "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE", "CREATE", "TABLE", "DROP", "ALTER", "ADD", "PRIMARY KEY", "FOREIGN KEY", "REFERENCES", "INDEX", "UNIQUE", "CHECK", "DEFAULT", "AUTO_INCREMENT", "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME", "CURRENT_USER", "DATABASE", "IF", "EXISTS", "THEN", "ELSE", "END", "CASE", "WHEN", "WHILE", "DO", "BEGIN", "DECLARE", "CURSOR", "OPEN", "CLOSE", "FETCH", "LOOP", "EXIT", "CONTINUE", "GOTO", "RETURN", "CALL", "PROCEDURE", "FUNCTION", "TRIGGER", "EVENT", "HANDLER", "REPLACE", "GRANT", "REVOKE", "PRIVILEGES", "WITH", "OPTION", "LOCK", "UNLOCK", "START", "TRANSACTION", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE", "ISOLATION", "LEVEL", "READ", "WRITE", "ONLY", "REPEATABLE", "COMMITTED", "SERIALIZABLE", "AUTOCOMMIT", "SHOW", "STATUS", "VARIABLES", "DATABASES", "TABLES", "INDEXES", "GRANTS", "PROCESSLIST", "KILL", "SHUTDOWN", "LOGS", "ERRORS", "WARNINGS", "SLAVE", "MASTER", "REPLICATION", "BINARY", "LOG", "POSITION", "FILE", "FORMAT", "PASSWORD", "USER", "HOST", "PRIVILEGE", "RELOAD", "FLUSH", "LOGS", "TABLES", "STATISTICS", "QUERY", "CACHE", "MEMORY"] 
     def __execute_query(self, event):
         db: DB = self.master.master.master.master.inner_state.db_connection
@@ -232,6 +266,9 @@ class SQLInput(ttk.Frame):
             
         self.master.master.master.query_explanation.update_treeview(None)
     
+    """
+    Method to highlight the keywords in the query input.
+    """
     def highlight_keywords(self, event):
         # Remove all tags
         self.query_input.tag_remove("keyword", "1.0", "end")
@@ -253,6 +290,9 @@ class SQLInput(ttk.Frame):
                     self.query_input.tag_add("keyword", start_idx, end_idx)
                 start_idx = end_idx
     
+    """
+    Constructor to instantiate the SQLInput class.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
@@ -274,10 +314,13 @@ class SQLInput(ttk.Frame):
 
         self.query_input.bind("<KeyRelease>", self.highlight_keywords)
 
-### LAYOUT ###
+"""
+Class LayoutHeader is a component that contains the input fields for the database connection.
+"""
 class LayoutHeader(ttk.Labelframe):
-
-
+    """
+    Method to handle the click event of the connect button.
+    """
     def connect_button_click(self, event):
         self.connect_button.config(state="disabled")
         if self.master.inner_state.db_connection:
@@ -314,18 +357,27 @@ class LayoutHeader(ttk.Labelframe):
         self.master.refresh_content_layout()
         self.connect_button.config(state="normal")
 
+    """
+    Method to refresh the connection status.
+    """
     def refresh_connection_status(self):
         if self.master.inner_state.db_connection:
             self.connected_label.config(text="Connected", style="success.TLabel")
         else:
             self.connected_label.config(text="Not Connected", style="danger.TLabel")
 
+    """
+    Method to refresh the connect button.
+    """
     def refresh_connect_button(self):
         if self.master.inner_state.db_connection:
             self.connect_button.config(text="Disconnect", style="danger.TButton")
         else:
             self.connect_button.config(text="Connect", style="primary.TButton")
 
+    """
+    Method to instantiate the LayoutHeader class.
+    """
     def __init__(self, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
@@ -359,14 +411,26 @@ class LayoutHeader(ttk.Labelframe):
         
         self.refresh_connection_status()
 
+"""
+Class LayoutContentNotLoggedIn is a component that contains the message to connect to the database first. Acts as a placeholder when there is no connection in place.
+"""
 class LayoutContentNotLoggedIn(ttk.LabelFrame):
+    """
+    Method to instantiate the LayoutContentNotLoggedIn class.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
         self.label = ttk.Label(self, text="Please connect to the database first", anchor=ttk.CENTER)
         self.label.pack(side = ttk.TOP, fill="both", expand=True)
 
+"""
+Class LayoutContent is the main component that organizes the Query Explainer components.
+"""
 class LayoutContent(ttk.Frame):
+    """
+    Method to refresh the query content.
+    """
     def refresh_query_content(self):
         # To be used after a new query
         image = Image.open('./assets/img/qep.png')
@@ -377,6 +441,9 @@ class LayoutContent(ttk.Frame):
 
         # Refresh treeview explanation
 
+    """
+    Constructor to instantiate the LayoutContent class.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
@@ -424,7 +491,13 @@ class LayoutContent(ttk.Frame):
         self.query_explanation = QueryExplanation(self.query_explanation_frame)
         self.query_explanation.pack(pady=4, padx = 8)
 
+"""
+Class LayoutFooter is the footer component of QUPEX. 
+"""
 class LayoutFooter(ttk.Frame):
+    """
+    Constructor to instantiate the LayoutFooter class.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pack()
@@ -432,14 +505,26 @@ class LayoutFooter(ttk.Frame):
         self.label = ttk.Label(self, text="Made with <3 by Team 1", anchor=ttk.CENTER, foreground="grey")
         self.label.pack(side = ttk.TOP, fill="both", expand=True)
 
-### APPLICATION LOGIC ###
+"""
+Class InnerState is a class that contains the global variables of the application for the application logic.
+"""
 class InnerState:
-    # Define the global variables here
+    """
+    Constructor to instantiate the InnerState class. 
+    This is where to define the global variables of the application.
+    """
     def __init__(self):
         self.db_connection = None
         self.graph = None
 
+"""
+Class App is the main component that organizes the QUPEX's components. 
+This is the main component that is rendered in the mainloop.
+"""
 class App(ttk.Window):  
+    """
+    Constructor to instantiate the App class.
+    """
     def __init__(self, inner_state: InnerState): 
         super().__init__(self, themename="darkly")
 
@@ -454,6 +539,9 @@ class App(ttk.Window):
         self.inner_state = inner_state
         self.generate_layout()
     
+    """
+    Method to refresh the content layout.
+    """
     def refresh_content_layout(self):
         # Used to re-render the entirety of the content layout to its default state
         self.content.pack_forget()
@@ -467,7 +555,9 @@ class App(ttk.Window):
         self.footer = LayoutFooter(self, borderwidth=2)
         self.footer.pack(side = ttk.TOP, padx=8, pady = 4, fill="x")
 
-
+    """
+    Method to login to the database.
+    """
     def login(self, address, database, port, username, password):
         self.inner_state.db_connection = None
         db_connection = DB({
@@ -479,13 +569,18 @@ class App(ttk.Window):
         })
         self.inner_state.db_connection = db_connection
             
-        
+    """
+    Method to disconnect from the database.
+    """
     def disconnect(self):
         if self.inner_state.db_connection:
             self.inner_state.db_connection.close_connection()
             self.inner_state.db_connection = None
             self.refresh_content_layout()
 
+    """
+    Method to generate the layout of QUPEX.
+    """
     def generate_layout(self):
         # Header that contains the input to the database connection
         self.header = LayoutHeader(self, borderwidth=2, text="Database Connection")
