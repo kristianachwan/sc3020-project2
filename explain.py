@@ -515,14 +515,14 @@ class Node:
         
         description = ""
         underestimate_reason = """
-            The answer is underestimate due to the lack of information to the details needed to calculatae the intricate costs in Postgres.
+            The answer is underestimate due to the lack of information to the details needed to calculate the intricate costs in Postgres.
         """
 
         overestimate_reason = """
             The answer is overestimated due to the way Postgres handle a certain type of relation (e.g. unique inner relation), which they implemented a much more optimized way to handle the join. Thus its cost estimation function is different as well.
         """
 
-        self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
+        
 
         if rel_inner.node_type == 'Materialize' and rel_outer.node_type == 'Seq Scan':
 
@@ -530,6 +530,7 @@ class Node:
 
             run_cost = (self.db.cpu_operator_cost + self.db.cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + rescan_cost * (num_input_tuples_rel_in - 1) + cost_rel_out    
             total_cost = startup_cost + run_cost
+            self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
            
             description = f"""
                 startup_cost = {startup_cost}
@@ -552,6 +553,7 @@ class Node:
             run_cost = (self.db.cpu_tuple_cost + rel_inner.startup_cost) * num_input_tuples_rel_out + cost_rel_out
 
             total_cost = startup_cost + run_cost
+            self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
 
             description = f"""
                 startup_cost = {startup_cost}
@@ -571,6 +573,7 @@ class Node:
         else:
             run_cost = (num_blocks_rel_out + num_blocks_rel_in * num_input_tuples_rel_out) * self.db.seq_page_cost
             total_cost = startup_cost + run_cost
+            self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
             description = f"""
                 Using the lecture's formula,
                 
