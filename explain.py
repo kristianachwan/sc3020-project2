@@ -5,7 +5,13 @@ from pprint import pp
 import math
 import re
 
+"""
+Class DB is the interface class to interact with the database. 
+"""
 class DB: 
+    """
+    Constructor to iniate connection with the database.
+    """
     def __init__(self, config): 
         self.host = config['host']
         self.port = config['port']
@@ -45,58 +51,94 @@ class DB:
             END $$;
         """) 
 
+    """
+    Method to close the connection to the database.
+    """
     def close_connection(self):
         self.cursor.close()
         self.connection.close()
         
+    """
+    Method to reset the connection to the database.
+    """
     def reset_connection(self):
         self.connection = psycopg2.connect(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
         self.cursor = self.connection.cursor()
         
+    """
+    Method to get the query plan of a given query.
+    """
     def get_query_plan(self, query: str): 
         query_plan = self.execute("EXPLAIN (FORMAT JSON, VERBOSE TRUE, BUFFERS TRUE, ANALYZE TRUE) " + query)[0][0][0][0]['Plan']
         return query_plan
 
+    """ 
+    Method to get the cpu_tuple_cost
+    """
     def get_cpu_tuple_cost(self):
         return float(self.execute("""
                 show cpu_tuple_cost;
             """)[0][0][0])
 
+    """
+    Method to get the block size of the database.
+    """
     def get_block_size(self): 
         return int(self.execute("""
                 select current_setting('block_size');
             """)[0][0][0])
     
+    """
+    Method to get the seq_page_cost of the database.
+    """
     def get_seq_page_cost(self):
         return float(self.execute("""
                 show seq_page_cost;
             """)[0][0][0])
     
+    """
+    Method to get the random_page_cost of the database.
+    """
     def get_random_page_cost(self):
         return float(self.execute("""
                 show random_page_cost;
             """)[0][0][0])
     
+    """
+    Method to get the cpu_operator_cost of the database.
+    """
     def get_cpu_operator_cost(self): 
         return float(self.execute("""
                 show cpu_operator_cost;
             """)[0][0][0])
     
+    """
+    Method to get the parallel_setup_cost of the database.
+    """
     def get_parallel_setup_cost(self): 
         return float(self.execute("""
                 show parallel_setup_cost;
             """)[0][0][0])
     
+    """
+    Method to get the parallel_tuple_cost of the database.
+    """
     def get_parallel_tuple_cost(self): 
         return float(self.execute("""
                 show parallel_tuple_cost;
             """)[0][0][0])
     
+    """
+    Method to get the cpu_index_tuple_cost of the database.
+    """
     def get_cpu_index_tuple_cost(self): 
         return float(self.execute("""
                 show cpu_index_tuple_cost
             """)[0][0][0])
 
+    """
+    Method to get the table statistics of a given table. Column names can be specified to get the statistics of only specific columns.
+    """
     def get_table_statistics(self, table_name, column_names = None): 
         query_results = self.execute("""
             SELECT {column_names} FROM pg_class WHERE relname = '{table_name}';
@@ -108,18 +150,30 @@ class DB:
         
         return table_statistics
     
+    """
+    Method to get the number of pages of a given table.
+    """
     def get_table_page_count(self, table_name): 
         return self.statistics[table_name]['relpages']
     
+    """
+    Method to get the number of tuples of a given table.
+    """
     def get_table_row_count(self, table_name): 
         return self.statistics[table_name]['reltuples']
 
+    """
+    Method to execute a query.
+    """
     def execute(self, query: str):
         self.cursor.execute(query)
         column_names = [description[0] for description in self.cursor.description]
         query_results = self.cursor.fetchall()
         return query_results, column_names
 
+    """
+    Method to check the validity of a query.
+    """
     def is_query_valid(self, query: str):    
         try:
             self.cursor.execute(query)
@@ -129,6 +183,9 @@ class DB:
         
         return True, None
 
+    """
+    Method to get the table names of the database.
+    """
     def get_table_names(self): 
         query_results = self.execute(
             """
@@ -146,6 +203,9 @@ class DB:
             table_names.append(table_name)
         return table_names
 
+    """
+    Method to get the column names of a given table.
+    """
     def get_column_names(self, table_name: str): 
         query_results = self.execute(
             """
@@ -161,13 +221,19 @@ class DB:
 
         return column_names
 
+    """
+    Method to get the overall statistics of a database.
+    """
     def get_statistics(self): 
         statistics = {} 
         for table_name in self.get_table_names(): 
             statistics[table_name] = self.get_table_statistics(table_name)
         
         return statistics 
-        
+    
+    """
+    Method to get the work_mem of the database.
+    """
     def get_work_mem(self):
         return int(self.execute("""
             SELECT setting::bigint * CASE unit
