@@ -493,12 +493,8 @@ class Node:
     """
     def get_cost_description_nested_loop(self):
         # compare sizes of 2 input relations. Smaller relation is rel_out and larger relation is rel_in
-        if self.children[0].row_count < self.children[1].row_count:
-            rel_inner = self.children[1]
-            rel_outer = self.children[0]
-        else:
-            rel_inner = self.children[0]
-            rel_outer = self.children[1]
+        rel_inner = self.children[1]
+        rel_outer = self.children[0]
 
         num_input_tuples_rel_out = rel_outer.row_count
         num_input_tuples_rel_in = rel_inner.row_count
@@ -514,6 +510,9 @@ class Node:
 
         startup_cost = 0
         run_cost = 0
+        total_cost = 0
+        psql_total_cost = self.total_cost
+        
         description = ""
         underestimate_reason = """
             The answer is underestimate due to the lack of information to the details needed to calculatae the intricate costs in Postgres.
@@ -523,11 +522,13 @@ class Node:
             The answer is overestimated due to the way Postgres handle a certain type of relation (e.g. unique inner relation), which they implemented a much more optimized way to handle the join. Thus its cost estimation function is different as well.
         """
 
+        self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
+
         if rel_inner.node_type == 'Materialize' and rel_outer.node_type == 'Seq Scan':
 
-            rescan_cost =  self.db.cpu_operator_cost * size_tuple_rel_in
+            rescan_cost =  self.db.cpu_operator_cost * num_input_tuples_rel_out
 
-            run_cost = (self.db.cpu_operator_cost + self.db.cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + rescan_cost * (size_tuple_rel_out - 1) + cost_rel_out    
+            run_cost = (self.db.cpu_operator_cost + self.db.cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + rescan_cost * (num_input_tuples_rel_in - 1) + cost_rel_out    
             total_cost = startup_cost + run_cost
            
             description = f"""
@@ -535,7 +536,7 @@ class Node:
                 The cost to retrieve the first row is zero
 
                 run_cost = (cpu_operator_cost + cpu_tuple_cost) * num_input_tuples_rel_out * num_input_tuples_rel_in + rescan_cost * (size_tuple_rel_out - 1) + cost_rel_out
-                            = ({self.db.cpu_operator_cost} + {self.db.cpu_tuple_cost}) * {num_input_tuples_rel_out} * {num_input_tuples_rel_in} + {rescan_cost} * ({size_tuple_rel_out} - 1) + {cost_rel_out}
+                            = ({self.db.cpu_operator_cost} + {self.db.cpu_tuple_cost}) * {num_input_tuples_rel_out} * {num_input_tuples_rel_in} + {rescan_cost} * ({num_input_tuples_rel_out} - 1) + {cost_rel_out}
                             = {run_cost}
                 
                 total_cost  = startup_cost + run_cost
@@ -560,6 +561,7 @@ class Node:
                          = {run_cost}
 
                 total_cost = startup_cost + run_cost
+                            = {total_cost}
 
                 psql_total_cost = {self.total_cost}
                 
@@ -586,7 +588,7 @@ class Node:
 
         # Confirmation values from EXPLAIN command
         psql_total_cost = self.total_cost  
-        self.valid = abs(total_cost - psql_total_cost) <= self.epsilon
+        
         
         return description
 
