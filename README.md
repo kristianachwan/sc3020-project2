@@ -15,7 +15,7 @@ $$ $$\$$ |$$ |  $$ |$$ |      $$ |      $$  /\$$\
 
 ```
 
-**QUery Plan EXplanation**
+**QUery Plan EXplainer**
 
 QUPEX aims to explain the derived cost from PostgreSQL `EXPLAIN` feature. This involves understanding the cost model of PostgreSQL internal working (refer to: [costsize.c](https://github.com/postgres/postgres/blob/master/src/backend/optimizer/path/costsize.c)) and database catalog. The explanation that we provide for the cost derivation is emphasizing on how the formula used and how/why certain parameters used. In the case we are unable to estimate correctly, we also do provide more explantions for better clarity.
 
